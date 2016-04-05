@@ -1,4 +1,5 @@
 #' @import NMOF
+#' @importFrom pracma erf
 NULL
 
 #' sseBulk
@@ -331,7 +332,7 @@ getGuess <- function(x, y, thresh, max=1, fraction=0.2, cores=1)
      sigma <- seq(0.1,5,length.out=50)
      levels <- list(mu=mu, sigma=sigma)
      mc.control <- list(mc.cores=cores)
-     res <- gridSearch(sseLogNormGS, levels, dataX=x, dataY=y, method='multicore', mc.control=mc.control)
+     res <- gridSearch(sseLogNormGS1, levels, dataX=x, dataY=y, method='multicore', mc.control=mc.control)
 
      # get a guess for tau based upon hints
      temp <- smooth.spline(x=tau, y=y, spar=0.5)
@@ -347,7 +348,7 @@ getGuess <- function(x, y, thresh, max=1, fraction=0.2, cores=1)
      }
      if(temp2$y[tau] > max)
      {
-          tau = which(temp2$y <= max*frac)
+          tau = which(temp2$y <= max*fraction)
      }
      tau <- temp2$x[tau]
 

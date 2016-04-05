@@ -1,9 +1,14 @@
-#' Code adapted from matlab code developed by Yi Cao at Cranfield University (see code header for more info)
+#' @import GraphAlignment
+#' @importFrom pracma isempty numel eps size zeros
+NULL
+
+#' Code adapted by Jay Warrick from matlab code developed by Yi Cao at Cranfield University (see LICENSE file)
 #' @param costMat A numeric matrix representing the pairwise cost/distance between all points
 #' @param resolution A numeric vector The number decimal places to keep during calculations (needed as distances are internally represented as integers for speed)
 #' @return list(rowsol=rowsol,cost=cost,v=v,u=u,costMat=costMat) where rowsol = the optimal col indicies associated with each row, cost = the final optimal distance cost, v = column reduction numbers, u = row reduction numbers, costMat = the user provided costMat
 lapjv  <- function(costMat,resolution) {
      ###### Header ######
+     #
      # returns [rowsol,cost,v,u,costMat]
      # LAPJV  Jonker-Volgenant Algorithm for Linear Assignment Problem.
      #

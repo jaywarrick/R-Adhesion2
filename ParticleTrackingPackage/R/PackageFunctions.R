@@ -1,65 +1,50 @@
 #' @import foreign
-#' @import plyr
+#' @import data.table
+#' @importFrom pracma numel
 NULL
 
-#' @title Take an arff file and reorganize it into a more standard 'table' format.
-#' @description Specifically this is used to import an arff file from JEX as JEX
-#' uses a column called 'Measurement' to define the type of measurment
-#' or property being stored and 'Value', the value of that property.
+#' Reorganize a table from long form to wide form.
 #'
-#' @param data An object that is the result of using foreign::read.arff(file) on an arff file
-#' @param baseName An optional basename to add to whatever label is in the \code{nameCol} portion of each row entry
-#' @param convertToNumeric An option to convert the columns of information within \code{data} leading up to
-#' \code{nameCol} and \code{valueCol} to numeric or to leave as text. Default is to convert to numeric (i.e., TRUE)
-#' @param nameCol The name of the column that describes the nature of the value in the \code{valueCol}
-#' @param valueCol The name of the column with the values of the properties listed in the \code{nameCol}
-reorganizeTable <- function(data, baseName=NA, convertToNumeric=TRUE, nameCol='Measurement', valueCol='Value')
+#' This function can be applied to data.frame objects or data.table objects. It
+#' returns the same type as given.
+#'
+#' @param data A data.table or data.frame
+#' @param idCols A character vector of id column names (e.g., 'Id')
+#' @param measurementCols A character vector of column names that describe measurements (e.g., a column
+#' called 'Measurement' with values such as 'Min', 'Max', 'Mean', etc.
+#' @param valueCols A character vector of column names (typically one) that contains the numeric data
+#' to reorganize into wide format (e.g., 'Value')
+#'
+#' @export
+reorganize <- function(data, idCols=NULL, measurementCols='Measurement', valueCols='Value')
 {
-     #require(plyr)
-     idCols <- names(data)
-     idCols <- idCols[-which(idCols %in% c(nameCol,valueCol))]
-     newData <- data.frame(stringsAsFactors=FALSE)
-     measurements <- unique(data[,nameCol])
-
-     for(m in measurements)
+     isDataTable <- FALSE
+     if(is.data.table(data))
      {
-          if(is.na(baseName))
-          {
-               newColName <- m
-               newColName <- gsub(' ','.',newColName, fixed=TRUE) # Get rid of extraneous spaces
-          }else
-          {
-               newColName <- paste(baseName,'.',m, sep='')
-               newColName <- gsub(' ','.',newColName, fixed=TRUE) # Get rid of extraneous spaces
-          }
-
-          temp <- data[data[,nameCol]==m,]
-          temp2 <- temp[,c(idCols,valueCol)]
-          if (length(idCols) == 0) {
-               temp2 <- data.frame(ReallyRandomNameYo = temp2)
-               names(temp2) <- newColName
-          }
-          else {
-               names(temp2)[names(temp2) == valueCol] <- newColName
-          }
-          if(nrow(newData) == 0)
-          {
-               newData <- temp2
-          }else
-          {
-               newData <- merge(newData, temp2, by=idCols)
-          }
+          isDataTable <- TRUE
+     }
+     else
+     {
+          data <- data.table(data)
      }
 
-     if(convertToNumeric)
+     # If idCols = NULL, then use all remaining cols except measurementCols and valueCols
+     if(is.null(idCols))
      {
-          for(n in idCols)
-          {
-               newData[,n] <- as.numeric(as.character(newData[,n]))
-          }
+          idCols <- names(data)[!(names(data) %in% c(measurementCols, valueCols))]
      }
 
-     return(newData)
+     formula <- as.formula(paste(paste(idCols, collapse='+'), " ~ ", paste(measurementCols, collapse='+')))
+     print(formula)
+     data <- dcast(data, as.formula(paste(paste(idCols, collapse='+'), " ~ ", paste(measurementCols, collapse='+'))), value.var = valueCols)
+     if(isDataTable)
+     {
+          return(data)
+     }
+     else
+     {
+          return(data.frame(data))
+     }
 }
 
 #' Return information and data for a log frequency sweep with the given parameters
@@ -135,7 +120,9 @@ getSweep <- function(amplitude=1, phaseShift=0, offset=0, sin=FALSE, ti=0, fi=2,
 }
 
 
-#' @title Get a table of time vs frequency for a log descending frequency sweep
+#' Get a table of time vs frequency
+#'
+#' Return the t vs f table for a descending log-frequency sweep
 #'
 #' @param t A numeric vector of times [s]
 #' @param fi A numeric value of the initial frequency of the sweep [Hz]
@@ -148,7 +135,9 @@ getFrequencies <- function(t=seq(0,300,0.035), fi=1, ff=0.01, duration=300)
      return(data.frame(t=t, f=fi*(ff/fi)^(t/duration)))
 }
 
-#' @title Calculate shear stress for given parameters
+#' Calculate shear stress for given parameters
+#'
+#' Based on laminar flow in a microchannel where the height is << width.
 #'
 #' @param f A numeric value or vector of frequencies for which to calculate shear stress values
 #' @param pixelAmplitude A numeric value of the maximum amplitude observed in an image [pixels] for a particl in the center streamline of a wide flat microchannel
@@ -163,4 +152,18 @@ getShearStress <- function(f, pixelAmplitude, h=200e-6, mu=0.00078, cameraPixelS
      micronAmplitude <- (6.45e-6/mag)*pixelAmplitude
      uMax <- 4*micronAmplitude*f
      return((2/3)*uMax*(6*mu)/h)
+}
+
+#' lseq
+#'
+#' Generate a sequence on a log scale
+#'
+#' @param from numeric starting value
+#' @param to numeric ending value
+#' @param length.out numeric number of numbers in the sequence between from and to
+#'
+#' @export
+lseq <- function (from, to, length.out)
+{
+     exp(seq(log(from), log(to), length.out = length.out))
 }

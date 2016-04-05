@@ -1,0 +1,10 @@
+The code in LAPJV.R is based upon the implementation from Yi Cao which is
+under BSD_2_clause as follows.
+
+YEAR: 2010
+COPYRIGHT HOLDER: Yi Cao
+
+This package is provided under MIT license
+
+YEAR: 2016
+COPYRIGHT HOLDER: Jay Warrick

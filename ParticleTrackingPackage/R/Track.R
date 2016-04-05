@@ -1,3 +1,10 @@
+#' @import methods
+NULL
+
+#' Track
+#'
+#' A class for storing a table of linked points
+#'
 #' @title A class representing a Track or locations over time for a specific particle
 #' @field id numeric ID of the particle being tracked
 #' @field points data.frame table of x, y, t, frame, vx, vy and optionally smoothed versions of vx and vy called vxs and vys (see method smoothVelocities)

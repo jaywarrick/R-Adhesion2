@@ -1,3 +1,6 @@
+#' @import methods
+NULL
+
 #' Class for storing and working with a set of points
 #' @field frame A length one numeric vector
 #' @field points A data.frame storing the id, x, and y information of each point in the set of points

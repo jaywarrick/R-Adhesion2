@@ -25,7 +25,7 @@ trackLengthFilter <- function(track, min=0, max=1000000)
 #' @return boolean whether the track meets the specified conditions
 trackFrameFilter <- function(track, startMin=0, startMax=1000000, endMin=0, endMax=1000000)
 {
-     startFrame <- first(track$points$frame)
+     startFrame <- track$points$frame[1]
      endFrame <- last(track$points$frame)
 
      if(startFrame >= startMin & startFrame <= startMax & endFrame >= endMin & endFrame <= endMax)

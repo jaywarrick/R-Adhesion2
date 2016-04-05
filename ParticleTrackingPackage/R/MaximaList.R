@@ -1,3 +1,6 @@
+#' @import methods
+NULL
+
 #' A class for storing and working with list of Maxima objects. This class is the
 #' class that actually does the point tracking over time.
 #' @field maxima A list of Maxima objects
@@ -23,7 +26,7 @@ MaximaList <- setRefClass('MaximaList',
                                     # require(foreign)
                                     if(!is.null(roiTable))
                                     {
-                                         maximaFile2 <- reorganizeTable(roiTable, nameCol='Metadata')
+                                         maximaFile2 <- reorganize(roiTable, measurementCols='Metadata')
                                          maximaFile2[,frameDimName] <- as.numeric(as.character(maximaFile2[,frameDimName]))
                                          temp <- list()
                                          for(r in 1:nrow(maximaFile2))
@@ -171,7 +174,7 @@ MaximaList <- setRefClass('MaximaList',
                                     }
                                     trackList <- new('TrackList')
                                     trackList$setStandardMeta(t0_Frame=t0_Frame, timePerFrame=timePerFrame)
-                                    count = 0
+                                    myCount = 0
                                     total = base::length(exportFrames)
                                     for(f in exportFrames)
                                     {
@@ -181,8 +184,8 @@ MaximaList <- setRefClass('MaximaList',
                                               data <- .maxima$points[i,]
                                               trackList$addTrackPoint(id=data$id, x=data$x, y=data$y, frame=.maxima$frame)
                                          }
-                                         count <- count + 1
-                                         cat("Generating TrackList: ", round(100*count/total, digits=2), "%\n", sep="")
+                                         myCount <- myCount + 1
+                                         cat("Generating TrackList: ", round(100*myCount/total, digits=2), "%\n", sep="")
                                     }
                                     trackList$setStandardMeta(t0_Frame=t0_Frame, timePerFrame=timePerFrame) # Set again to ensure information filters down to all tracks
                                     return(trackList)

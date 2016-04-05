@@ -1,3 +1,8 @@
+#' @import Matrix
+#' @import matrixStats
+#' @importFrom pracma cross isempty numel
+NULL
+
 
 # Installe the GraphAlignment package from bioconductor if necessary
 if ( !require("GraphAlignment") )
@@ -368,7 +373,7 @@ testLAPAccuracy_directionality <- function(min=10, max=1000, i=5, directionality
      return(duh2)
 }
 
-testLAPAccuracy_outOfFrame <- function(n=10, mags=seq(0,0.1,length.out=3))
+testLAPAccuracy_outOfFrame <- function(n=10, mags=seq(0,0.1,length.out=3), directionality=10)
 {
      accuracy1 <- c()
      accuracy2 <- c()
@@ -377,14 +382,14 @@ testLAPAccuracy_outOfFrame <- function(n=10, mags=seq(0,0.1,length.out=3))
      {
           # Create points to track
           points <- getPoints(n=n, movement=c(m,0,0), direction=c(1,0,0), parallelNoise=0.1/4, perpendicularNoise=((0.1/4)/directionality))
-          t1OutOfFrame <- subset(points$t1, x > 1)
-          t1InFrame <- subset(points$t1, x <= 1)
+          t1OutOfFrame <- subset(points$t1, get('x') > 1)
+          t1InFrame <- subset(points$t1, get('x') <= 1)
           newPoints <- points
           newPoints$t1 <- t1InFrame
 
           # Track them
-          temp1 <- plotAssignments(points=points, digits=4, maxDist=m+2*0.1, direction=c(1,0,0), directionality=10)
-          temp2 <- plotAssignments(points=newPoints, digits=4, maxDist=m+2*0.1, direction=c(1,0,0), directionality=10)
+          temp1 <- plotAssignments(points=points, digits=4, maxDist=m+2*0.1, direction=c(1,0,0), directionality=directionality)
+          temp2 <- plotAssignments(points=newPoints, digits=4, maxDist=m+2*0.1, direction=c(1,0,0), directionality=directionality)
 
           # Store the results
           accuracy1 <- c(accuracy1, temp1$errorRate)
@@ -411,10 +416,10 @@ testLAPAccuracy_outOfFrame2 <- function(n=10, mags=seq(0,0.1,length.out=6), dire
      {
           # Create points to track
           points <- getPoints(n=n, movement=c(m,0,0), direction=c(1,0,0), parallelNoise=0.1/4, perpendicularNoise=((0.1/4)/directionality))
-          t0OutOfFrame <- subset(points$t0, x < 0.1)
-          t0InFrame <- subset(points$t0, x >= 0.1)
-          t1OutOfFrame <- subset(points$t1, x > 1)
-          t1InFrame <- subset(points$t1, x <= 1)
+          t0OutOfFrame <- subset(points$t0, get('x') < 0.1)
+          t0InFrame <- subset(points$t0, get('x') >= 0.1)
+          t1OutOfFrame <- subset(points$t1, get('x') > 1)
+          t1InFrame <- subset(points$t1, get('x') <= 1)
           newPoints <- points
           newPoints$t0 <- t0InFrame
           newPoints$t1 <- t1InFrame
@@ -529,12 +534,12 @@ plotMethod <- function(results, name, normalize=FALSE)
      mags <- unique(results$mag)
      cells <- unique(results$cells)
      plot(x=c(), y=c(), xlim=xlim, ylim=ylim, type='l', xlab='Points Out Of Frame [%]', ylab='Error Rate [%]')
-     count <- 1
+     myCount <- 1
      for(c in cells)
      {
           data <- subset(results, cells==c)
-          lines(data$poofMean, data[,name], lty=count)
-          count = count + 1
+          lines(data$poofMean, data[,name], lty=myCount)
+          myCount <- myCount + 1
      }
 }
 

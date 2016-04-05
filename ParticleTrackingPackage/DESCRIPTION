@@ -4,18 +4,16 @@ Title: Particle Tracking
 Version: 0.1.0
 Author: Jay Warrick
 Maintainer: Jay Warrick <warrick@wisc.edu>
-Description: Package for creating, storing, and tracking points.
-License: GPL-2 | GPL-3
+Description: Package for creating, storing, and tracking points. The LAPJV algorithm for solving the linear assigment problem is adapted from Yi Cao's Matlab implementation under BSD_2_clause license (see LAPJV.R and LICENSE file).
+License: file LICENSE
 LazyData: TRUE
-Depends:
-    GraphAlignment
 Imports:
     methods,
     foreign,
-    plyr,
-    stats,
+    data.table,
     Matrix,
     NMOF,
-    matrixStats,
-    pracma
+    pracma,
+    GraphAlignment,
+    matrixStats
 RoxygenNote: 5.0.1

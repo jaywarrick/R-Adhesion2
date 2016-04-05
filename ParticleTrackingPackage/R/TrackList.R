@@ -1,4 +1,5 @@
-#' @import pracma
+#' @import methods
+#' @importFrom pracma numel
 NULL
 
 
@@ -28,7 +29,7 @@ TrackList <- setRefClass('TrackList',
 
 							require(foreign)
 							tracksFile <- read.arff(file)
-							tracksFile2 <- reorganizeTable(tracksFile, nameCol='Metadata')
+							tracksFile2 <- reorganize(tracksFile, measurementCols='Metadata')
 							for(row in 1:nrow(tracksFile2))
 							{
 								id <- tracksFile2[row,'Track']
@@ -251,11 +252,11 @@ TrackList <- setRefClass('TrackList',
 							@param ... additional arguments to pass to the called function"
 
 							tot <- length()
-							count <- 0
+							myCount <- 0
 							for(track in tracks)
 							{
-								count <- count + 1
-								cat("Calling", funName, "on track", count, "of", tot, "\n")
+							     myCount <- myCount + 1
+								cat("Calling", funName, "on track", myCount, "of", tot, "\n")
 								# Have to do eval(parse()) because track[[funName]] is NULL while track$parsedFunName is not NULL, don't know why
 								# Now that the function is loaded we can call it using the [[]] method
 								theCall <- paste("track$'", funName, "'", sep="")
@@ -486,7 +487,7 @@ TrackList <- setRefClass('TrackList',
 					)
 )
 
-#' @title Get the last element of a vector
+#' Get the last element of a vector
 #'
 #' @param x vector
 last <- function(x)

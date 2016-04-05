@@ -2,3 +2,6 @@
 *.Rd
 *.Rdata
 *.Rhistory
+.Rproj.user
+
+*.css
