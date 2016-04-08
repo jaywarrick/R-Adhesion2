@@ -62,7 +62,7 @@ reorganize <- function(data, idCols=NULL, measurementCols='Measurement', valueCo
 #' @param ff numeric final frequency of the sweep#'
 #'
 #' @export
-getSweep <- function(amplitude=1, phaseShift=0, offset=0, sin=FALSE, ti=0, fi=2, ff=0.1, sweepDuration=300, t=seq(0,300,0.05), guess=NULL, calcVelocity=TRUE)
+getSweep <- function(amplitude=1, phaseShift=0, offset=0, sin=FALSE, ti=0, fi=2, ff=0.1, sweepDuration=300, t=seq(0,300,0.05), guess=NULL, calcVelocity=TRUE, flipped=TRUE)
 {
      tOriginal <- t
      t <- t-ti
@@ -74,13 +74,21 @@ getSweep <- function(amplitude=1, phaseShift=0, offset=0, sin=FALSE, ti=0, fi=2,
      {
           A <- amplitude
           phi <- phaseShift
-          b <- offset + pi
+          b <- offset
+          if(flipped)
+          {
+               b <- b + pi # Flipped to match arduino actuation
+          }
      }
      else
      {
           A <- guess['amplitude']
           phi <- guess['phaseShift']
-          b <- guess['offset'] + pi
+          b <- guess['offset']
+          if(flipped)
+          {
+               b <- b + pi # Flipped to match arduino actuation
+          }
      }
 
      offsetInflections <- (  (-1*(phi/(pi/2))) %/% 1  )
