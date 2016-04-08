@@ -59,7 +59,9 @@ reorganize <- function(data, idCols=NULL, measurementCols='Measurement', valueCo
 #' @param t numeric time at which to calculate the function value
 #' @param guess list of parameter values to override the inidividual parameter values
 #' @param calcVelocity logical value whether to calculate the velocity or not
-#' @param ff numeric final frequency of the sweep
+#' @param ff numeric final frequency of the sweep#'
+#'
+#' @export
 getSweep <- function(amplitude=1, phaseShift=0, offset=0, sin=FALSE, ti=0, fi=2, ff=0.1, sweepDuration=300, t=seq(0,300,0.05), guess=NULL, calcVelocity=TRUE)
 {
      tOriginal <- t
@@ -72,13 +74,13 @@ getSweep <- function(amplitude=1, phaseShift=0, offset=0, sin=FALSE, ti=0, fi=2,
      {
           A <- amplitude
           phi <- phaseShift
-          b <- offset
+          b <- offset + pi
      }
      else
      {
           A <- guess['amplitude']
           phi <- guess['phaseShift']
-          b <- guess['offset']
+          b <- guess['offset'] + pi
      }
 
      offsetInflections <- (  (-1*(phi/(pi/2))) %/% 1  )
