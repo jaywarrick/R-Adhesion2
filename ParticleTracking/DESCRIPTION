@@ -7,25 +7,11 @@ Maintainer: Jay Warrick <warrick@wisc.edu>
 Description: Package for creating, storing, and tracking points. The LAPJV algorithm for solving the linear assigment problem is adapted from Yi Cao's Matlab implementation under BSD_2_clause license (see LAPJV.R and LICENSE file).
 License: file LICENSE
 LazyData: TRUE
-Collate:
-    ParticleTracking.R
-    LAPJV.R
-    Tracking.R
-    PackageFunctions.R
-    Maxima.R
-    MaximaList.R
-    Track.R
-    TrackList.R
-    TrackFilters.R
-    TrackFitting.R
-Imports:
-    methods,
-    foreign,
-    data.table,
-    Matrix,
-    NMOF,
-    pracma,
-    GraphAlignment,
-    matrixStats,
-    signal
+Collate: ParticleTracking.R LAPJV.R Tracking.R PackageFunctions.R
+        Maxima.R MaximaList.R Track.R TrackList.R TrackFilters.R
+        TrackFitting.R
+Imports: methods, foreign, data.table, Matrix, NMOF, pracma,
+        GraphAlignment, matrixStats, signal
 RoxygenNote: 5.0.1
+NeedsCompilation: no
+Packaged: 2016-04-11 18:35:19 UTC; jaywarrick
