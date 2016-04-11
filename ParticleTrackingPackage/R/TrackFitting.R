@@ -180,7 +180,7 @@ getBulkPhaseShiftGS <- function(trackList, ti=seq(-3,3,1/30), phaseShift=seq(-pi
      #Choose decent amplitude
      amplitude <- mean(abs(trackMatrix))*3 # max(as.numeric(trackList$getProp(fun=function(x){r <- x$range('vx', rel=TRUE); r <- (r[2]-r[1])/5; return(r)})))
 
-     lines(t, getSweep(amplitude = amplitude, fi=trackList$meta$fi, ff=trackList$meta$ff, t=t), col='green')
+     lines(t, getSweep(amplitude = amplitude, fi=trackList$meta$fi, ff=trackList$meta$ff, ti=0, t=t), col='green')
 
      #Time scaling factor is basically useless, we can be about 0.015 seconds off by guessing 0.035s frame rate after 300s (i.e, a half a frame).
      #Vary phaseShift, ti
