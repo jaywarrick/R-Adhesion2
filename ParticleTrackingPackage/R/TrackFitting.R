@@ -12,6 +12,8 @@ NULL
 #' @param ti A numeric value of the initial time of the first frame
 #'
 #' @return the sum square error between the TrackList data and a sweep with the provided amplitude and phaseShift
+#'
+#' @export
 sseBulk <- function(trackList, trackMatrix, amplitude, phaseShift, timeScalingFactor, ti)
 {
      # Cols are frames, rows are track ids
@@ -34,6 +36,8 @@ sseBulk <- function(trackList, trackMatrix, amplitude, phaseShift, timeScalingFa
 #' @param timeScalingFactor default
 #'
 #' @return the sum square error between the TrackList data and a sweep with the provided amplitude and phaseShift
+#'
+#' @export
 sseBulkGS <- function(x, trackList, trackMatrix, amplitude, timeScalingFactor)
 {
 
@@ -42,7 +46,7 @@ sseBulkGS <- function(x, trackList, trackMatrix, amplitude, timeScalingFactor)
      # we pass the 'trackMatrix' so we don't have to obtain it each iteration
 
      # get the sweep (for this we need the 'trackList')
-     sweep <- getSweep(amplitude=amplitude, phaseShift=x[2], offset=pi, sin=trackList$meta$sin, ti=x[1], fi=trackList$meta$fi, ff=trackList$meta$ff, sweepDuration=timeScalingFactor*trackList$meta$sweepDuration, t=trackList$meta$tAll, guess=NULL)
+     sweep <- getSweep(amplitude=amplitude, phaseShift=0, offset=pi, sin=trackList$meta$sin, ti=x[1], fi=trackList$meta$fi, ff=trackList$meta$ff, sweepDuration=timeScalingFactor*trackList$meta$sweepDuration, t=trackList$meta$tAll, guess=NULL)
      # For each index in tAll (i.e., for each frame)
 
      #sse <- sum((t(trackMatrix)-sweep$v)^2, na.rm=TRUE) # Do the transpose because the subtract function typically makes the subtracted vector vertical
@@ -63,6 +67,8 @@ sseBulkGS <- function(x, trackList, trackMatrix, amplitude, timeScalingFactor)
 #' @param ff default
 #'
 #' @return the sum square error between the TrackList data and a sweep with the provided amplitude and phaseShift
+#'
+#' @export
 sseBulk2 <- function(trackList, trackMatrix, amplitude, phaseShift, ti, fi, ff)
 {
      # Cols are frames, rows are track ids
@@ -82,6 +88,8 @@ sseBulk2 <- function(trackList, trackMatrix, amplitude, phaseShift, ti, fi, ff)
 #'
 #' @param trackList A TrackList object
 #' @param tiGuess A numeric value guessing the frame at which time actually equals zero (i.e., the fluid frequency sweep is started).
+#'
+#' @export
 getBulkPhaseShift <- function(trackList, tiGuess=0)
 {
      phaseShift <- pi
@@ -115,6 +123,8 @@ getBulkPhaseShift <- function(trackList, tiGuess=0)
 #'
 #' @param trackList A TrackList object
 #' @param tiGuess A numeric value guessing the frame at which time actually equals zero (i.e., the fluid frequency sweep is started).
+#'
+#' @export
 getBulkPhaseShift2 <- function(trackList, tiGuess=0)
 {
      phaseShift <- pi
@@ -151,12 +161,26 @@ getBulkPhaseShift2 <- function(trackList, tiGuess=0)
 #' @param phaseShift default
 #' @param cores default
 #' @param trackList A TrackList object
-getBulkPhaseShiftGS <- function(trackList, ti=seq(-1,1,1/30), phaseShift=seq(-pi,pi,pi/30), cores=1)
+#'
+#' @export
+getBulkPhaseShiftGS <- function(trackList, ti=seq(-3,3,1/30), phaseShift=seq(-pi,pi,pi/30), cores=1)
 {
      trackMatrix <- trackList$getMatrix()
 
+     t <- as.numeric(colnames(trackMatrix))
+     x <- colMeans(trackMatrix, na.rm=T)
+     bf <- butter(3, 0.1) # Low-pass filter
+     trackMatrix <- filtfilt(bf, x)
+     plot(t, x, type='l', main='Average (black), Butterworth(3,0.1) (red)')
+     lines(t,trackMatrix, col='red', lwd=3)
+
+     plot(t, x, type='l', log='x', main='Average (black), Butterworth(3,0.1) (red)')
+     lines(t,trackMatrix, col='red', lwd=3)
+
      #Choose decent amplitude
-     amplitude <- max(as.numeric(trackList$getProp(fun=function(x){r <- x$range('x', rel=TRUE); r <- (r[2]-r[1])/5; return(r)})))
+     amplitude <- mean(abs(trackMatrix))*3 # max(as.numeric(trackList$getProp(fun=function(x){r <- x$range('vx', rel=TRUE); r <- (r[2]-r[1])/5; return(r)})))
+
+     lines(t, getSweep(amplitude = amplitude, fi=trackList$meta$fi, ff=trackList$meta$ff, t=t), col='green')
 
      #Time scaling factor is basically useless, we can be about 0.015 seconds off by guessing 0.035s frame rate after 300s (i.e, a half a frame).
      #Vary phaseShift, ti
@@ -164,17 +188,17 @@ getBulkPhaseShiftGS <- function(trackList, ti=seq(-1,1,1/30), phaseShift=seq(-pi
      if(cores > 1)
      {
           mc.control <- list(mc.cores=cores)
-          res <- gridSearch(sseBulkGS, levels=list(ti=ti, phaseShift=phaseShift), trackList=trackList, trackMatrix=trackMatrix, amplitude=amplitude, timeScalingFactor=1, method='multicore', mc.control=mc.control)
+          res <- gridSearch(sseBulkGS, levels=list(ti=ti), trackList=trackList, trackMatrix=trackMatrix, amplitude=amplitude, timeScalingFactor=1, method='multicore', mc.control=mc.control)
      }
      else
      {
-          res <- gridSearch(sseBulkGS, levels=list(ti=ti, phaseShift=phaseShift), trackList=trackList, trackMatrix=trackMatrix, amplitude=amplitude, timeScalingFactor=1, method='loop')
+          res <- gridSearch(sseBulkGS, levels=list(ti=ti), trackList=trackList, trackMatrix=trackMatrix, amplitude=amplitude, timeScalingFactor=1, method='loop')
      }
 
-     finalPhaseShift <- res$minlevels[2]
+     finalPhaseShift <- 0 #res$minlevels[2]
      finalTi=res$minlevels[1]
      limitFlag <- 0
-     if(finalPhaseShift %in% range(ti) | finalTi %in% range(phaseShift))
+     if(finalPhaseShift %in% range(phaseShift) | finalTi %in% range(ti))
      {
      	limitFlag <- 1
      }
@@ -189,6 +213,8 @@ getBulkPhaseShiftGS <- function(trackList, ti=seq(-1,1,1/30), phaseShift=seq(-pi
 #' @param dataY default
 #'
 #' @return the sum square error between the data and a logNorm cumulative curve
+#'
+#' @export
 sseLogNormGS1 <- function(x, dataX, dataY)
 {
      temp <- logNorm(x=dataX, mu=x[1], sigma=x[2])
@@ -205,6 +231,8 @@ sseLogNormGS1 <- function(x, dataX, dataY)
 #' @param dataY default
 #'
 #' @return the sum square error between the data and a logNorm cumulative curve
+#'
+#' @export
 sseLogNormGS2 <- function(x, dataX, dataY)
 {
      temp <- logNorm2(dataX, x[1], x[2], x[3], x[4], x[5])
@@ -220,6 +248,8 @@ sseLogNormGS2 <- function(x, dataX, dataY)
 #' @param y default
 #' @param mu default
 #' @param sigma default
+#'
+#' @export
 sseLogNorm1 <- function(x, y, mu, sigma)
 {
      temp <- logNorm(x=x, mu=mu, sigma=sigma)
@@ -234,6 +264,8 @@ sseLogNorm1 <- function(x, y, mu, sigma)
 #' @param x default
 #' @param mu default
 #' @param sigma default
+#'
+#' @export
 logNorm <- function(x=seq(0,10,0.1), mu=1, sigma=1)
 {
      return(1-(1/2+(1/2)*erf((log(x)-log(mu))/(sqrt(2*sigma)))))
@@ -244,6 +276,8 @@ logNorm <- function(x=seq(0,10,0.1), mu=1, sigma=1)
 #' @param x default
 #' @param dataX default
 #' @param dataY default
+#'
+#' @export
 sseLogNorm2GS <- function(x, dataX, dataY)
 {
      # If gridSearch, then variables are all passed in via x
@@ -263,6 +297,8 @@ sseLogNorm2GS <- function(x, dataX, dataY)
 #' @param sigma1 default
 #' @param mu2 default
 #' @param sigma2 default
+#'
+#' @export
 sseLogNorm2 <- function(x, y, alpha, mu1, sigma1, mu2, sigma2)
 {
      # If gridSearch, then variables are all passed in via x

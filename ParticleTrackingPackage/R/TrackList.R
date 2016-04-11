@@ -1,5 +1,5 @@
 #' @import methods
-#' @importFrom pracma numel
+#' @importFrom pracma numel isempty
 NULL
 
 
@@ -338,6 +338,13 @@ TrackList <- setRefClass('TrackList',
 							widths <- ceiling(dist/(v*dt))
 							widths[widths > maxWidth] <- maxWidth
 							return(widths)
+						},
+						calculateTrackAverage = function(slot = 'vx', rel=FALSE, validOnly=FALSE)
+						{
+						     "Calculate the average value of a track slot such as x, y, vx, vxs, vy, and vys
+						     return it as a vector."
+
+						     return(colMeans(getMatrix(slot=slot, rel=rel, validOnly=validOnly)))
 						},
 						calculateValidFrames = function(fit, validStart=0.01, validEnd=0.99)
 						{

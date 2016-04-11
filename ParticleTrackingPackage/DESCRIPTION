@@ -7,6 +7,17 @@ Maintainer: Jay Warrick <warrick@wisc.edu>
 Description: Package for creating, storing, and tracking points. The LAPJV algorithm for solving the linear assigment problem is adapted from Yi Cao's Matlab implementation under BSD_2_clause license (see LAPJV.R and LICENSE file).
 License: file LICENSE
 LazyData: TRUE
+Collate:
+    ParticleTracking.R
+    LAPJV.R
+    Tracking.R
+    PackageFunctions.R
+    Maxima.R
+    MaximaList.R
+    Track.R
+    TrackList.R
+    TrackFilters.R
+    TrackFitting.R
 Imports:
     methods,
     foreign,
