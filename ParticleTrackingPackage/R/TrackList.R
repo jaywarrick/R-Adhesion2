@@ -497,6 +497,8 @@ TrackList <- setRefClass('TrackList',
 #' Get the last element of a vector
 #'
 #' @param x vector
+#'
+#' @export
 last <- function(x)
 {
 	return(x[numel(x)])
