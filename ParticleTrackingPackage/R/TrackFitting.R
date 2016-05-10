@@ -3,6 +3,101 @@
 #' @importFrom pracma erf
 NULL
 
+# # getTrackSweep
+# #
+# # This method is provided as a convenience. It calls 'getSweep' using parameters that exist within
+# # the 'Track' objects meta field when available or the 'getSweep' defaults.
+# #
+# # @param amplitude A numeric value
+# # @param offset A numeric value
+# # @param selectedFrames A boolean indicating whether to only get sweep values for valid frames only
+# # @param guess A boolean indicating whether to guess appropriate parameters for this track"
+# #
+# # @export
+# getTrackSweep <- function(track, amplitude=1, offset=mean(getSlot(slot='x')), selectedFramesOnly=FALSE, guess=NULL)
+# {
+#      if(selectedFramesOnly)
+#      {
+#           frames <- selectedFrames
+#      }
+#      else
+#      {
+#           frames <- track$pts$frame
+#      }
+#      args <- list(sin=meta$sin, fi=meta$fi, ff=meta$ff, allTimes=meta$allTimes, phaseShift=meta$phaseShift, amplitude=amplitude, offset=offset, frames=frames, guess=guess)
+#      args <- args[!isempty(args)]
+#      return(do.call(getSweep, args))
+# }
+
+#' setOscillatoryMeta
+#'
+#' Set the sweep parameters used to predict particle motion during a descending log frequency sweep.
+#' The phase shift is not set here as that is determined using the getTimeOffset method.
+#'
+#' @param trackList TrackList object for whic to set the oscillatory meta data
+#' @param sin boolean Whether the tracks are sinusoidal or triangular
+#' @param fi numeric The initial frequency of the sweep
+#' @param ff numeric The final frequency of the sweep
+#' @param t0_Frame numeric The frame associated with time=0 of the sweep
+#' @param timePerFrame numeric The time per frame of the data in seconds
+#' @param sweepDuration numeric value of the duration of the sweep in seconds
+#'
+#' @export
+setOscillatoryMeta <- function(trackList, sin, fi, ff, t0_Frame, timePerFrame, sweepDuration)
+{
+     trackList$meta$sin <- sin
+     trackList$meta$fi <- fi
+     trackList$meta$ff <- ff
+     trackList$meta$sweepDuration <- sweepDuration
+     trackList$updateFramesAndTimes(t0_Frame=t0_Frame, timePerFrame=timePerFrame)
+     trackList$calculateDerivatives(slots=c('x','y'))
+     trackList$callTrackFun('setMeta', trackList$meta)
+}
+
+#' calculateValidTimes
+#'
+#' @param trackList TrackList object for which to calculate valid times
+#'
+#' @return numeric vecotr of the valid times associated with the selectedFrames of the TrackList
+#'
+#' @export
+calculateValidTimes <- function(trackList)
+{
+     return(trackList$meta$allTimes[meta$allFrames %in% meta$selectedFrames])
+}
+
+# # sseTrack
+# #
+# # Calculates the sum square error (i.e., sse) between this track and a sweep function with the
+# # given 'amplitude', 'phaseShift',and 'offset'. The additional sweep parameters of sin, allTimes, fi
+# # and ff are passed on from this Track objects meta data field, which is why this convenience
+# # function was created.
+# #
+# # @param amplitude numeric value indicating the amplitude used in the 'getSweep' function
+# # @param phaseShift numeric value indicating the phaseShift used in the 'getSweep' function
+# # @param offset numeric value indicating the offset used in the 'getSweep' function
+# # @param selectedFramesOnly A boolean to limit the calculation to just the 'selectedFrames' listed in this Track object
+# #
+# # @export
+# sseTrack <- function(track, amplitude=50, phaseShift=0, offset=0, selectedFramesOnly=FALSE)
+# {
+#      if(selectedFramesOnly)
+#      {
+#           frames <- selectedFrames
+#      }
+#      else
+#      {
+#           frames <- track$pts$frame
+#      }
+#      args <- list(sin=meta$sin, fi=meta$fi, ff=meta$ff, allTimes=meta$allTimes, amplitude=amplitude, offset=offset, frames=frames)
+#      args <- args[!isempty(args)]
+#      predicted <- do.call(getSweep, args)
+#      data <- object$pts$vx                ### Explicitly fitting vx ###
+#      indicesToGet <- which(track$pts$frame %in% frames)
+#      result <- sum((data[indicesToGet]-predicted$v)^2)
+#      return(result)
+# }
+
 #' sseBulk
 #'
 #' @param trackList A TrackList object
@@ -21,8 +116,8 @@ sseBulk <- function(trackList, trackMatrix, amplitude, phaseShift, timeScalingFa
      # we pass the 'trackMatrix' so we don't have to obtain it each iteration
 
      # get the sweep (for this we need the 'trackList')
-     sweep <- getSweep(amplitude=amplitude, phaseShift=phaseShift, offset=pi, sin=trackList$meta$sin, ti=ti, fi=trackList$meta$fi, ff=trackList$meta$ff, sweepDuration=timeScalingFactor*trackList$meta$sweepDuration, t=trackList$meta$tAll, guess=NULL)
-     # For each index in tAll (i.e., for each frame)
+     sweep <- getSweep(amplitude=amplitude, phaseShift=phaseShift, offset=pi, sin=trackList$meta$sin, ti=ti, fi=trackList$meta$fi, ff=trackList$meta$ff, sweepDuration=timeScalingFactor*trackList$meta$sweepDuration, t=trackList$meta$allTimes, guess=NULL)
+     # For each index in allTimes (i.e., for each frame)
      sse <- sum((t(trackMatrix)-sweep$v)^2, na.rm=TRUE) # Do the transpose because the subtract function typically makes the subtracted vector vertical
      cat("(", amplitude, ",", timeScalingFactor, ",", ti, ") = ", sse, "\n", sep="")
      return(sse)
@@ -47,8 +142,8 @@ sseBulkGS <- function(x, trackList, trackMatrix, amplitude, timeScalingFactor)
      # we pass the 'trackMatrix' so we don't have to obtain it each iteration
 
      # get the sweep (for this we need the 'trackList')
-     sweep <- getSweep(amplitude=amplitude, phaseShift=0, offset=pi, sin=trackList$meta$sin, ti=x[1], fi=trackList$meta$fi, ff=trackList$meta$ff, sweepDuration=timeScalingFactor*trackList$meta$sweepDuration, t=trackList$meta$tAll, guess=NULL)
-     # For each index in tAll (i.e., for each frame)
+     sweep <- getSweep(amplitude=amplitude, phaseShift=0, offset=pi, sin=trackList$meta$sin, ti=x[1], fi=trackList$meta$fi, ff=trackList$meta$ff, sweepDuration=timeScalingFactor*trackList$meta$sweepDuration, t=trackList$meta$allTimes, guess=NULL)
+     # For each index in allTimes (i.e., for each frame)
 
      #sse <- sum((t(trackMatrix)-sweep$v)^2, na.rm=TRUE) # Do the transpose because the subtract function typically makes the subtracted vector vertical
 
@@ -84,8 +179,8 @@ sseBulk2 <- function(trackList, trackMatrix, amplitude, phaseShift, ti, fi, ff)
      # we pass the 'trackMatrix' so we don't have to obtain it each iteration
      timeScalingFactor = 1
      # get the sweep (for this we need the 'trackList')
-     sweep <- getSweep(amplitude=amplitude, phaseShift=phaseShift, offset=pi, sin=trackList$meta$sin, ti, fi=fi, ff=ff, sweepDuration=timeScalingFactor*trackList$meta$sweepDuration, t=trackList$meta$tAll, guess=NULL)
-     # For each index in tAll (i.e., for each frame)
+     sweep <- getSweep(amplitude=amplitude, phaseShift=phaseShift, offset=pi, sin=trackList$meta$sin, ti, fi=fi, ff=ff, sweepDuration=timeScalingFactor*trackList$meta$sweepDuration, t=trackList$meta$allTimes, guess=NULL)
+     # For each index in allTimes (i.e., for each frame)
      sse <- sum((t(trackMatrix)-sweep$v)^2, na.rm=TRUE) # Do the transpose because the subtract function typically makes the subtracted vector vertical
      cat("(", amplitude, ",", 1.00, ",", ti, ",", fi, ",", ff, ") = ", sse, "\n", sep="")
      return(sse)
@@ -104,7 +199,7 @@ getBulkPhaseShift <- function(trackList, tiGuess=0)
      phaseShift <- pi
      # require(stats)
      trackMatrix <- trackList$getMatrix()
-     amplitude <- max(as.numeric(trackList$getProp(fun=function(x){r <- x$range('x', rel=TRUE); r <- (r[2]-r[1])/5; return(r)})))
+     amplitude <- max(as.numeric(trackList$applyFun_Return(fun=function(x){r <- x$range('x', rel=TRUE); r <- (r[2]-r[1])/5; return(r)})))
      guess <- c(timeScalingFactor=1, ti=tiGuess)
      #guess <- c(amplitude=amplitude, phaseShift=1.2*pi)
      #amplitudeLimits=c(0.1*amplitude, amplitude)
@@ -139,7 +234,7 @@ getBulkPhaseShift2 <- function(trackList, tiGuess=0)
      phaseShift <- pi
      #require(stats)
      trackMatrix <- trackList$getMatrix()
-     amplitude <- max(as.numeric(trackList$getProp(fun=function(x){r <- x$range('x', rel=TRUE); r <- (r[2]-r[1])/5; return(r)})))
+     amplitude <- max(as.numeric(trackList$applyFun_Return(fun=function(x){r <- x$range('x', rel=TRUE); r <- (r[2]-r[1])/5; return(r)})))
      guess <- c(ti=tiGuess, fi=trackList$meta$fi, ff=trackList$meta$ff)
      #guess <- c(amplitude=amplitude, phaseShift=1.2*pi)
      #amplitudeLimits=c(0.1*amplitude, amplitude)
@@ -176,7 +271,7 @@ getBulkPhaseShiftGS <- function(trackList, ti=seq(-1,1,1/30), phaseShift=seq(-pi
 {
      trackMatrix <- trackList$getMatrix()
 
-     t <- trackList$meta$tAll
+     t <- trackList$meta$allTimes
      x <- colMeans(trackMatrix, na.rm=T)
      bf <- butter(3, 0.1) # Low-pass filter
      trackMatrix <- filtfilt(bf, x)
@@ -187,8 +282,12 @@ getBulkPhaseShiftGS <- function(trackList, ti=seq(-1,1,1/30), phaseShift=seq(-pi
      # plot(t,trackMatrix, type='l', log='x', col='red', lwd=2)
 
      #Choose decent amplitude
-     amplitude <- mean(abs(trackMatrix))*1 # max(as.numeric(trackList$getProp(fun=function(x){r <- x$range('vx', rel=TRUE); r <- (r[2]-r[1])/5; return(r)})))
+     amplitude <- mean(abs(trackMatrix))*1 # max(as.numeric(trackList$applyFun_Return(fun=function(x){r <- x$range('vx', rel=TRUE); r <- (r[2]-r[1])/5; return(r)})))
 
+     if(is.null(trackList$meta$fi) | is.null(trackList$meta$ff))
+     {
+          stop("The initial and final frequency of the log frequency sweep must be set in the TrackList as a part of the meta list named as 'fi' and 'ff'.")
+     }
      lines(t, sign(getSweep(amplitude = amplitude, fi=trackList$meta$fi, ff=trackList$meta$ff, ti=0, t=t, flipped=TRUE)$v), col='green')
 
      #Time scaling factor is basically useless, we can be about 0.015 seconds off by guessing 0.035s frame rate after 300s (i.e, a half a frame).
@@ -227,7 +326,7 @@ getBulkPhaseShiftGS <- function(trackList, ti=seq(-1,1,1/30), phaseShift=seq(-pi
 sseLogNormGS1 <- function(x, dataX, dataY)
 {
      temp <- logNorm(x=dataX, mu=x[1], sigma=x[2])
-     # For each index in tAll (i.e., for each frame)
+     # For each index in allTimes (i.e., for each frame)
      sse <- sum((dataY-temp)^2, na.rm=TRUE) # Do the transpose because the subtract function typically makes the subtracted vector vertical
      cat("(", x[1], ",", x[2], ") = ", sse, "\n", sep="")
      return(sse)
@@ -245,7 +344,7 @@ sseLogNormGS1 <- function(x, dataX, dataY)
 sseLogNormGS2 <- function(x, dataX, dataY)
 {
      temp <- logNorm2(dataX, x[1], x[2], x[3], x[4], x[5])
-     # For each index in tAll (i.e., for each frame)
+     # For each index in allTimes (i.e., for each frame)
      sse <- sum((dataY-temp)^2, na.rm=TRUE) # Do the transpose because the subtract function typically makes the subtracted vector vertical
      cat("(", x[1], ",", x[2], ",", x[3], ",", x[4], ",", x[5], ") = ", sse, "\n", sep="")
      return(sse)
@@ -262,7 +361,7 @@ sseLogNormGS2 <- function(x, dataX, dataY)
 sseLogNorm1 <- function(x, y, mu, sigma)
 {
      temp <- logNorm(x=x, mu=mu, sigma=sigma)
-     # For each index in tAll (i.e., for each frame)
+     # For each index in allTimes (i.e., for each frame)
      sse <- sum((y-temp)^2, na.rm=TRUE) # Do the transpose because the subtract function typically makes the subtracted vector vertical
      cat("(", mu, ",", sigma, ") = ", sse, "\n", sep="")
      return(sse)
@@ -291,7 +390,7 @@ sseLogNorm2GS <- function(x, dataX, dataY)
 {
      # If gridSearch, then variables are all passed in via x
      temp <- logNorm2(x=dataX, alpha=x[1], mu1=x[2], sigma1=x[3], mu2=x[4], sigma2=x[5])
-     # For each index in tAll (i.e., for each frame)
+     # For each index in allTimes (i.e., for each frame)
      sse <- sum((dataY-temp)^2, na.rm=TRUE) # Do the transpose because the subtract function typically makes the subtracted vector vertical
      cat("(", x[1], ",", x[2], ",", x[3], "," , x[4], ",", x[5], ") = ", sse, "\n", sep="")
      return(sse)
@@ -312,7 +411,7 @@ sseLogNorm2 <- function(x, y, alpha, mu1, sigma1, mu2, sigma2)
 {
      # If gridSearch, then variables are all passed in via x
      temp <- logNorm2(x=x, alpha=alpha, mu1=mu1, sigma1=sigma1, mu2=mu2, sigma2=sigma2)
-     # For each index in tAll (i.e., for each frame)
+     # For each index in allTimes (i.e., for each frame)
      sse <- sum((y-temp)^2, na.rm=TRUE) # Do the transpose because the subtract function typically makes the subtracted vector vertical
      cat("(", alpha, ",", mu1, ",", sigma1, "," , mu2, ",", sigma2, ") = ", sse, "\n", sep="")
      return(sse)

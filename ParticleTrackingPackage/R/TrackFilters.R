@@ -3,12 +3,13 @@
 #' @param track Track The track to filter
 #' @param min numeric The minimum length of a track (inclusive, >=)
 #' @param max numeric The maximum length of a track (inclusive, <=)
+#'
 #' @return boolean whether the track meets the specified conditions
 #'
 #' @export
 trackLengthFilter <- function(track, min=0, max=1000000)
 {
-     l <- track$length()
+     l <- track$frameCount()
      if(l >= min & l <=max)
      {
           return(TRUE)
@@ -19,16 +20,20 @@ trackLengthFilter <- function(track, min=0, max=1000000)
      }
 }
 
+#' trackMinRangeFilter
+#'
 #' Filter for testing tracks based on a min displacement [pixels]
 #'
 #' @param track Track The track to filter
-#' @param min numeric The minimum range of displacement of a track (inclusive, >=)
+#' @param slot character value indicating the slot/column in the pts data.frame to analyze
+#' @param min numeric value indicating the minimum range (max-min) of the values in the specified slot allowed (inclusive, <=)
+#'
 #' @return boolean whether the track meets the specified conditions
 #'
 #' @export
-trackXDisplacementFilter <- function(track, min=4)
+trackMinRangeFilter <- function(track, slot, min=4)
 {
-     l <- range(track$points$x)
+     l <- track$range(slot=slot, rel=FALSE)
      l <- l[2]-l[1]
      if(l >= min)
      {
@@ -40,16 +45,20 @@ trackXDisplacementFilter <- function(track, min=4)
      }
 }
 
+#' trackMaxRangeFilter
+#'
 #' Filter for testing tracks based on a min displacement [pixels]
 #'
 #' @param track Track The track to filter
-#' @param max numeric The maximum y-velocity of a track (inclusive, <=)
+#' @param slot character value indicating the slot/column in the pts data.frame to analyze
+#' @param max numeric value indicating the maximum range (max-min) of the values in the specified slot allowed (inclusive, <=)
+#'
 #' @return boolean whether the track meets the specified conditions
 #'
 #' @export
-trackYSmoothedVelocityFilter <- function(track, max=4)
+trackMaxRangeFilter <- function(track, slot, max=4)
 {
-     l <- range(track$points$vys)
+     l <- range(track$pts[,slot])
      l <- l[2]-l[1]
      if(l <= max)
      {
@@ -61,6 +70,8 @@ trackYSmoothedVelocityFilter <- function(track, max=4)
      }
 }
 
+#' trackFrameFilter
+#'
 #' Filter for testing if tracks exist within indicated frame bounds.
 #'
 #' @param track Track The track to be tested
@@ -73,8 +84,8 @@ trackYSmoothedVelocityFilter <- function(track, max=4)
 #' @export
 trackFrameFilter <- function(track, startMin=0, startMax=1000000, endMin=0, endMax=1000000)
 {
-     startFrame <- track$points$frame[1]
-     endFrame <- last(track$points$frame)
+     startFrame <- track$pts$frame[1]
+     endFrame <- last(track$pts$frame)
 
      if(startFrame >= startMin & startFrame <= startMax & endFrame >= endMin & endFrame <= endMax)
      {

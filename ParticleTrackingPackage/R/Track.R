@@ -3,15 +3,16 @@ NULL
 
 #' Track
 #'
-#' A class for storing a table of linked points
+#' A class for storing a table of linked pts. All Track objects should have column called
+#' 'frame' and 't' in their 'pts' data.frame field to store the frame number and time
+#' associated with each point.
 #'
 #' @title A class representing a Track or locations over time for a specific particle
 #' @field id numeric ID of the particle being tracked
-#' @field points data.frame table of x, y, t, frame, vx, vy and optionally smoothed versions of vx and vy called vxs and vys (see method smoothVelocities)
-#' @field validFrames numeric vector Vector frame numbers of the track that are set to 'valid' using 'setValidFrames' method
-#' @field meta TrackList information from the parent TrackList object of this Track object
+#' @field pts data.frame table of x, y, t, frame, vx, vy and optionally smoothed versions of vx and vy called vxs and vys (see method smoothVelocities)
+#' @field meta list of Track information
 Track <- setRefClass('Track',
-                     fields = list(id='numeric', points='data.frame', validFrames='numeric', meta='list'),
+                     fields = list(id='numeric', pts='data.frame', meta='list'),
                      methods = list(
                           initializeWithTrackROI = function(id, start, pattern, t0_Frame, timePerFrame)
                           {
@@ -49,107 +50,148 @@ Track <- setRefClass('Track',
                                     }
                                }
                                id <<- as.numeric(as.character(id))
-                               #                                if(base::length(frames) > base::length(tAll))
-                               #                                {
-                               #                                     stop(cat("Length of tAll seems to short for the data that is being used to initialize the track. frames length = ", base::length(frames), " tAll length = ", base::length(tAll)))
-                               #                                }
-                               points <<- data.frame(frame=frames, x=x, y=y, t=(frames - t0_Frame) * timePerFrame)
-                               calculateVelocities()
+                               pts <<- data.frame(frame=frames, x=x, y=y)
+                               updateTimes(t0_Frame, timePerFrame)
                           },
-                          setMeta = function(meta)
+                          updateTimes = function(t0_Frame, timePerFrame)
                           {
-                               meta <<- meta
+                               pts$t <<- (pts$frame - t0_Frame) * timePerFrame
                           },
-                          length = function()
+                          frameCount = function()
                           {
                                "Return the number of frames in this track."
 
-                               return(nrow(points))
+                               return(nrow(pts))
                           },
-                          getSlot = function(slot, rel=FALSE, validOnly=FALSE)
+                          getSlot = function(slot, rel=FALSE, selectedFrames=NULL)
                           {
-                               "Get a vector of the values indicated by 'slot' for this point.
-                               This accessor method is useful because the data is stored within
-                               a data.frame field called points.
-                               'validOnly' indicates whether to return values for the validFrames only or all frames
-                               typical slots are x, y, t, frame, vx, vy"
+                               "Get a vector of the values indicated by 'slot' for this point.\n
+                               @param slot character value indicating the slot for which to obtain data within the 'pts' data.frame field within the Track\n
+                               @param rel logical value indicating whether to get the slot information relative to the mean of that slot information (default = FALSE)\n
+                               @param selectedFrames numeric vector of frame numbers for which to grab the slot information (default=NULL, which gets all the slot information available for this track)"
 
-                               if(isempty(validFrames) & validOnly)
+                               if(!is.null(selectedFrames))
                                {
-                                    cat("Track ID: ", id, " - Can't determine valid frames as this track either doesn't have any frames that are actually valid or they have not been set yet for this track\n")
-                                    return(numeric(0))
-                               }
-                               if(validOnly)
-                               {
-                                    validIndices <- points$frame %in% validFrames
+                                    validIndices <- which(pts$frame %in% selectedFrames)
                                }
                                else
                                {
-                                    validIndices <- points$frame
+                                    if(base::length(pts$frame) > 0)
+                                    {
+                                         validIndices <- 1:base::length(pts$frame)
+                                    }
+                                    else
+                                    {
+                                         validIndices <- numeric(0)
+                                    }
                                }
-
 
                                if(rel)
                                {
-                                    temp <- points[,slot] - mean(points[,slot])
-                                    if(validOnly)
-                                    {
-                                         temp <- temp[validIndices] # frames start at 0 while R indices start at 1
-                                    }
+                                    temp <- pts[,slot] - mean(pts[,slot])
+                                    temp <- temp[validIndices] # frames start at 0 while R indices start at 1
                                }
                                else
                                {
-                                    temp <- points[,slot]
-                                    if(validOnly)
-                                    {
-                                         temp <- temp[validIndices]
-                                    }
+                                    temp <- pts[,slot]
+                                    temp <- temp[validIndices]
                                }
                                temp <- temp[!is.na(temp)]
                                return(temp)
                           },
                           range = function(slot, rel=FALSE)
                           {
-                               "For the indicated 'slot' (i.e., column within the points field),
-                               return the range that this value takes."
+                               "For the indicated 'slot' (i.e., column within the pts field),
+                               return the range that this value takes.\n
+                               @param slot character value indicating the slot for which to obtain data within the 'pts' data.frame field within the Track\n
+                               @param rel logical value indicating whether to get the slot information relative to the mean of that slot information (default = FALSE)"
 
                                ret <- base::range(getSlot(slot, rel=rel))
                                return(ret)
                           },
-                          calculateVelocities = function()
+                          calculateDerivatives = function(slots, withRespectTo='t', prefix='v')
                           {
-                               "Internally populate/update the values 'vx' and 'vy' within
-                               the points vield using 'getDerivative(x, y)'"
+                               "Internally populate/update the time derivative calculations for each
+                               raw data columns listed in the character vector 'slots' using the
+                               'getDerivative(x, t)' function. The derivative is performed relative to
+                               another data column (e.g., 't' by default) specified in the 'withRespectTo'
+                               parameter. The calcualted derivatives are stored in the 'pts' data.frame
+                               field. These new columns are the names of the original data columns specified
+                               by the slots parameter prepended by the user-specified 'prefix' parameter
+                               (default, prefix = 'v')."
 
-                               points$vx <<- getDerivative(points$x, points$t)
-                               points$vy <<- getDerivative(points$y, points$t)
+                               slots <- slots[slots %in% names(pts)]
+                               if(base::length(slots) > 0)
+                               {
+                                    for(i in 1:base::length(slots))
+                                    {
+                                         pts[,paste0(prefix, slots[i])] <<- getDerivative(pts[,slots[i]], pts[,withRespectTo])
+                                    }
+                               }
+                               else
+                               {
+                                    stop("Track::calculateDerivatives --> Couldn't find a slot matching any of the slots provided. Aborting.")
+                               }
                           },
-                          smoothVelocities = function(allWidths, allFrames)
+                          calculateSmoothedData = function(windowWidths, slots, suffix='s')
                           {
-                               "Smooth the vx and vy velocity calculations for this track\n
-                               @param allWidths A numeric vector of all the appropriate widths for each possible frame in the parent TrackList\n
-                               @param allFrames A numeric vector of all the possible frames of the parent TrackList"
+                               "Smooth the specified slots for this track\n
+                               @param windowWidths A data.frame(frame=numeric, width=numeric) that at least contains a width corresponding to each frame in this Track, or a single value indicating the width to be used for all frames.\n
+                               @param slots character vector of all the columns in the 'pts' data.frame field for which smoothed versions of the data should be calculated."
 
-                               # Restrict the analysis to just the frames in this track
-                               widths <- allWidths[points$frame %in% allFrames]
+                               if(is.data.frame(windowWidths))
+                               {
+                                    if(sum(names(windowWidths) %in% c('frame','width')) == 2)
+                                    {
+                                         # Restrict the analysis to just the frames in this track
+                                         widths <- windowWidths[windowWidths$frame %in% pts$frame,'width']
+                                         if(base::length(widths) != base::length(pts$frame))
+                                         {
+                                              stop("Track::calculateSmoothedData --> the data.frame provided does not specify a width for each frame in this Track. Aborting.")
+                                         }
+                                    }
+                                    else
+                                    {
+                                         stop("Track::calculateSmoothedData --> The supplied windowWidths data.frame does not contain a column labeled 'frame' and 'width'. Aborting 'calculateSmoothedData'. Aborting.")
+                                    }
+                               }
+                               else if(is.vector(windowWidths) && is.numeric(windowWidths) && base::length(windowWidths) == 1)
+                               {
+                                    widths <- rep(widths, nrow(pts))
+                               }
+                               else
+                               {
+                                    stop("Track::calculateSmoothedData --> windowWidths must be a data.frame or single numeric value. Aborting.")
+                               }
 
-                               # Apply it to the vx data
-                               points$vxs <<- sapply(seq_along(points$frame),
-                                                     getAverage,
-                                                     frames=points$frame,
-                                                     widths=widths,
-                                                     data=points$vx
-                               )
+                               # Now working with the 'widths' variable instead of the 'windowWidths' variable
+                               if(!all(is.finite(widths)))
+                               {
+                                    stop("Track::calculateSmoothedData --> some window widths were not finite. Aborting.")
+                               }
+                               if(min(widths) < 2)
+                               {
+                                    warning("Track::calculateSmoothedData --> There exists a width in the specified widths that is smaller that the minimum width of 2 (i.e., two frames to average). Setting those widths to 2 to proceed.")
+                                    widths[widths < 2] <- 2
+                               }
+                               if(base::length(widths) != nrow(pts))
+                               {
+                                    stop("The widths provided are not specified for all the points in the track. Aborting.")
+                               }
 
-                               # Apply it to the vy data
-                               points$vys <<- sapply(seq_along(points$frame),
-                                                     getAverage,
-                                                     frames=points$frame,
-                                                     widths=widths,
-                                                     data=points$vy
-                               )
+                               # Actually get down to business
+                               slots <- slots[slots %in% names(pts)] # Find as many matching slots as possible.
+                               for(slot in slots)
+                               {
+                                    newSlot <- paste0(slot, suffix)
+                                    pts[,newSlot] <<- sapply(seq_along(pts[,slot]),
+                                                              getAverage,
+                                                              widths=widths,
+                                                              x=pts[,slot]
+                                    )
+                               }
                           },
-                          plotTrack = function(slotX='t', slotY='x', funX=NULL, funY=NULL, relX=FALSE, relY=TRUE, validOnly=FALSE, add=FALSE, withTitle=TRUE, col='black', lwd=1, lty=1, xlab=slotX, ylab=slotY, type='l', ...)
+                          plotTrack = function(slotX='frame', slotY='x', funX=NULL, funY=NULL, relX=FALSE, relY=TRUE, selectedFrames=NULL, add=FALSE, withTitle=TRUE, col='black', lwd=1, lty=1, xlab=slotX, ylab=slotY, type='l', ...)
                           {
                                "Plot the track\n
                                @param slotX The x variable string name\n
@@ -159,14 +201,14 @@ Track <- setRefClass('Track',
                                @param funX function A function to transform the slotX data before plotting (e.g., to scale between pixels per second velocity to microns per second velocity)\n
                                @param funY function A function transform the slotY data before plotting (see funX)\n
                                @param ... Additional args are passed to the 'plot' method\n
-                               @param validOnly A boolean indicating whether to plot 'valid frames' only (see setValidFrames) or all frames in this track"
+                               @param selectedFrames numeric vector indicating which frames to plot or NULL (default) to plot all frames in this track"
 
-                               xData <- getSlot(slotX, relX, validOnly=validOnly)
+                               xData <- getSlot(slotX, relX, selectedFrames=selectedFrames)
                                if(!is.null(funX))
                                {
                                     xData <- funX(xData)
                                }
-                               yData <- getSlot(slotY, relY, validOnly=validOnly)
+                               yData <- getSlot(slotY, relY, selectedFrames=selectedFrames)
                                if(!is.null(funY))
                                {
                                     yData <- funY(yData)
@@ -182,11 +224,6 @@ Track <- setRefClass('Track',
                                if(relY)
                                {
                                     ylab <- paste(ylab, ' - mean(', ylab, ')', sep='')
-                               }
-                               if(base::length(list(...)$validOnly)>0)
-                               {
-                                    print(list(...))
-                                    stop("what?")
                                }
 
                                if(isempty(xData) || isempty(yData) || is.na(xData) || is.na(yData))
@@ -211,112 +248,36 @@ Track <- setRefClass('Track',
                                     }
                                }
                           },
-                          addPoint = function(x, y, t, frame)
+                          addPoint = function(frame, ...)
                           {
-                               "Add a point to the 'points' field of this track. It is
+                               "Add a point to the 'pts' field of this track. It is
                                assumed you are adding things in an appropriate order.
-                               Typically the points are listed in order of frame.\n
-                               @param x A single numeric value indicating the x position of the point\n
-                               @param y A single numeric value indicating the y position of the point\n
-                               @param t A single numeric value indicating the time corresponding to this frame/point\n
-                               @param frame A single numeric value indicating the frame corresponding to this frame/point"
+                               Typically the pts are listed in order of frame.\n
+                               @param frame A single numeric value indicating the frame corresponding to this frame/point\n
+                               @param ... A variable list of numeric values that represent the point's data (e.g., x and y position)\n"
 
-                               points <<- rbind(points, data.frame(x=x, y=y, t=t, frame=frame))
+                               pts <<- rbind(pts, data.frame(frame=frame, ...))
                           },
-                          #                           show = function()
-                          #                           {
-                          #                                "
-                          #                                #' Prints the information of this object to the command line
-                          #                                #' output. This overrides the basic 'show' method as a track
-                          #                                #' carries a reference to its parent trackList (if it has been
-                          #                                #' added to a trackList using the 'setTrack' method) which
-                          #                                #' results in recursive printing of TrackList information
-                          #                                #' because a 'show' for 'TrackList' calls 'show' on each 'Track'.
-                          #                                #' This method eliminates this issue.
-                          #                                "
-                          #                                cat("Reference class object of class 'Track'\n")
-                          #                                for(name in names(Track$fields()))
-                          #                                {
-                          #                                     if(name %in% c('meta'))#c('x','y','t','vx','vy')))
-                          #                                     {
-                          #                                          cat("Field '", name, "':\n", sep='')
-                          #                                          cat("(can't print... recursive)\n")
-                          #                                     }
-                          #                                     else
-                          #                                     {
-                          #                                          cat("Field '", name, "':\n", sep='')
-                          #                                          methods::show(.self[[name]])
-                          #                                     }
-                          #                                }
-                          #                                cat("\n")
-                          #                           },
-                          setValidFrames = function(frames)
+                          setMeta = function(meta)
                           {
-                               "Set the 'valid frames' of the Track. Valid frames are those frames
-                               which correspond to steady motion of the particle (i.e., not when
-                               the particle/cell is switching directions due to changes in flow)\n
-                               @param frames The numeric vector indicating the frames of this track that are 'valid'"
+                               "Basically a convenience function for setting the meta from a parent TrackList object but fine to use otherwise as well."
 
-                               validFrames <<- points$frame[points$frame %in% frames]
-                          },
-                          getTrackSweep = function(amplitude=1, offset=mean(getSlot(slot='x')), validFramesOnly=FALSE, guess=NULL)
-                          {
-                               "This method is provided as a convenience. It calls 'getSweep' using
-                               parameters that exist within the 'Track' and parent 'TrackList'
-                               when available or the 'getSweep' defaults.\n
-                               @param amplitude A numeric value\n
-                               @param offset A numeric value\n
-                               @param validFrames A boolean indicating whether to only get sweep values for valid frames only\n
-                               @param guess A boolean indicating whether to guess appropriate parameters for this track"
-
-                               if(validFramesOnly)
-                               {
-                                    frames <- validFrames
-                               }
-                               else
-                               {
-                                    frames <- points$frame
-                               }
-                               args <- list(sin=meta$sin, fi=meta$fi, ff=meta$ff, tAll=meta$tAll, phaseShift=meta$phaseShift, amplitude=amplitude, offset=offset, frames=frames, guess=guess)
-                               args <- args[!isempty(args)]
-                               return(do.call(getSweep, args))
-                          },
-                          sseTrack = function(amplitude=50, phaseShift=0, offset=0, validFramesOnly=FALSE)
-                          {
-                               "Calculates the sum square error (i.e., sse) between this track
-                               and a sweep function with the given 'amplitude', 'phaseShift',
-                               and 'offset'.\n
-                               @param validFramesOnly A boolean to limit the calculation to just the 'validFrames' listed in this Track.\n
-                               The additional sweep parameters of sin, tAll, fi, and ff are passed\n
-                               from the track's parent 'TrackList'."
-
-                               if(validFramesOnly)
-                               {
-                                    frames <- validFrames
-                               }
-                               else
-                               {
-                                    frames <- points$frame
-                               }
-                               args <- list(sin=meta$sin, fi=meta$fi, ff=meta$ff, tAll=meta$tAll, amplitude=amplitude, offset=offset, frames=frames)
-                               args <- args[!isempty(args)]
-                               predicted <- do.call(getSweep, args)
-                               data <- object$points$vx                ### Explicitly fitting vx ###
-                               indicesToGet <- which(points$frame %in% frames)
-                               result <- sum((data[indicesToGet]-predicted$v)^2)
-                               return(result)
+                               meta <<- meta
                           }
                      )
 )
 
+#' getAverage
+#'
 #' Get the adjustable running window average of the data
+#'
 #' @param i The index within 'frames' at which to calculate an average over a window centered at this location
 #' @param frames The frames in this track
 #' @param widths A vector of window widths appropriate for each frame in the 'frames' of this track
 #' @param data The vector of data for which we will calculate the windowed averages
-getAverage <- function(i, frames, widths, data)
+getAverage <- function(i, widths, x)
 {
-     # Subtract 1 to represent the number of intervals instead of number of points to average
+     # Subtract 1 to represent the number of intervals instead of number of pts to average
      width <- widths[i] - 1
 
      # calculate the index on the left of the interval
@@ -327,18 +288,23 @@ getAverage <- function(i, frames, widths, data)
      }
 
      # calculate the width to reach index on the right of the interval
-     if((leftIndex+width) > length(frames))
+     if((leftIndex+width) > length(x))
      {
-          width <- length(frames)-leftIndex
+          width <- length(x)-leftIndex
      }
 
-     # return the mean of the data over the interval
-     mean(data[leftIndex:(leftIndex+width)])
+     # return the mean of the x over the interval
+     mean(x[leftIndex:(leftIndex+width)])
 }
 
+#' getDerivative
+#'
 #' Get the derivative of a vector
+#'
 #' @param x A numeric vector on which to calculate the derivative
 #' @param t A numeric vecotor of times with which to determine dt for derivative calculations
+#'
+#' @export
 getDerivative <- function(x, t)
 {
      v <- numeric(0)
@@ -349,10 +315,15 @@ getDerivative <- function(x, t)
      return(v)
 }
 
+#' localDerivative
+#'
 #' Get the local derivative around a point in a vector accounding for boundary scenarios at the start and end of the vector
+#'
 #' @param x A numeric vector of data
 #' @param t A numeric vector of time for calculating dt of the derivative
 #' @param i A numeric value indicating the index in the x and t for which to calculate the local derivative
+#'
+#' @export
 localDerivative <- function(x, t, i)
 {
      if(i == 1)
@@ -371,12 +342,12 @@ localDerivative <- function(x, t, i)
      }
 }
 
-#' @title This is a three point interpolation of the derivative where the interpolated point
-#' is the middle of the 3 points.
+#' interpolateDerivative
 #'
-#' @description This simplifies to the the three-point midpoint formula
+#' This is a three point interpolation of the derivative where the interpolated point
+#' is the middle of the 3 pts. This simplifies to the the three-point midpoint formula
 #' when the time steps are equal but can handle when timesteps are unequal (i.e., the
-#' time-step on either side of the 3 points is not equal)
+#' time-step on either side of the 3 pts is not equal)
 #'
 #' @param f0 numeric left function value
 #' @param f1 numeric middle function value
@@ -385,6 +356,8 @@ localDerivative <- function(x, t, i)
 #' @param x1 numeric middle independent value
 #' @param x2 numeric right independent value
 #' @param xj numeric x value for which to evaluate the function
+#'
+#' @export
 interpolateDerivative <- function(f0, f1, f2, x0, x1, x2, xj)
 {
      term1 <- f0*((2*xj-x1-x2)/((x0-x1)*(x0-x2)))

@@ -42,12 +42,12 @@ for(t in myT)
 
 
 bf <- butter(3, 0.1)                        # 10 Hz low-pass filter
-t <- trackList$meta$tAll
+t <- trackList$meta$allTimes
 x <- colMeans(trackList$getMatrix(), na.rm=T)
 y <- filtfilt(bf, x)
 
-duh <- getSweep(sin=T, amplitude=2048, fi=1, ff=0.01, ti=-2, t=trackList$meta$tAll)
-duh2 <- getSweep(sin=F, amplitude=2048, fi=1, ff=0.01, ti=-2, t=trackList$meta$tAll)
+duh <- getSweep(sin=T, amplitude=2048, fi=1, ff=0.01, ti=-2, t=trackList$meta$allTimes)
+duh2 <- getSweep(sin=F, amplitude=2048, fi=1, ff=0.01, ti=-2, t=trackList$meta$allTimes)
 plot(duh$t, -duh$v, col="red", lwd=1, type='l')#, xlim=c(0,5))
 lines(duh2$t, -duh2$v, col="blue", lwd=1)
 abline(h=0)

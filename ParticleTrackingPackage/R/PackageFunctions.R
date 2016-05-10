@@ -104,7 +104,7 @@ getSweep <- function(amplitude=1, phaseShift=0, offset=0, sin=FALSE, ti=0, fi=2,
      endTimeI <- endTimeI[length(endTimeI)]
      if(is.na(endTimeI))
      {
-          stop(paste(t[length(t)], "is greater than last time of last inflection point. Therefore, there must be an error in fi/ff or tAll as there are inflections guaranteed in during times ti to tf given fi and ff."))
+          stop(paste(t[length(t)], "is greater than last time of last inflection point. Therefore, there must be an error in fi/ff or allTimes as there are inflections guaranteed in during times ti to tf given fi and ff."))
      }
      inflections <- inflections[startTimeI:endTimeI]
      inflectionNums <- inflectionNums[startTimeI:endTimeI]

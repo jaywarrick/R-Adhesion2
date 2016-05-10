@@ -1,5 +1,5 @@
 bf <- butter(3, 0.1)                        # 10 Hz low-pass filter
-t <- trackList$meta$tAll
+t <- trackList$meta$allTimes
 x <- colMeans(trackList$getMatrix(), na.rm=T)
 y <- filtfilt(bf, x)
 lines(t, y, col="blue", lwd=1)

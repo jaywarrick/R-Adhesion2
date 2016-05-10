@@ -1,0 +1,50 @@
+rm(list=ls())
+psl <- new('PointSetList')
+psl$initializeWithJEXROIFile(path ='/Users/jaywarrick/Documents/MMB/Projects/Adhesion/TesterMaxima/x0_y0.jxd')
+#psl$generatePointSetPlots(path='/Users/jaywarrick/Documents/MMB/Projects/Adhesion/TesterMaxima/Plots')
+#psl$track(trackingStart='last', trackingEnd='first', trim = T, directionalLinearAssignment, digits=1, maxDist=150, direction=c(1,0), perpendicularPenaltyFactor=10, uniformityDistThresh=3)
+
+temp <- psl$applyFun_Return(fun=function(.pointSet){return(.pointSet$pointCount())})
+temp <- data.frame(frame=as.numeric(as.character(names(temp))), val=as.vector(unlist(temp)))
+plot(temp$frame, temp$val, type='l')
+
+library(signal)
+t <- tl$meta$allFrames
+x <- temp$val
+smoothedX <- smoothData(x, 30)
+plot(t, x, type='l')
+lines(t, smoothedX, col='red', lwd=2)
+
+# pointSet0 <- psl$getPointSet(frame=10)
+# pointSet1 <- psl$getPointSet(frame=9)
+# results <- directionalLinearAssignment(pointSet0=pointSet0, pointSet1=pointSet1, maxDist=150, direction=c(1,0), perpendicularPenaltyFactor=10, uniformityDistThresh=-1, digits=1)
+# plotAssignments2(pointSet0, pointSet1, results)
+# duh <- getDirectionalCostMatrix(data0=as.matrix(pointSet0$getPointsWithoutId()), data1 = as.matrix(pointSet1$getPointsWithoutId()), digits=1, maxDist = 150, direction=c(1,0), perpendicularPenaltyFactor = 10)
+#assignments <- directionalLinearAssignment(pointSet0=p0, pointSet1=p1, digits=1, maxDist=150, direction=c(1,0), perpendicularPenaltyFactor=10, uniformityDistThresh=3)
+
+# pt0 <- pointSet0$getPoint(index=3)
+# pt1 <- pointSet1$getPoint(index=71)
+# pt0 <- as.matrix(pt0[,c('x','y')])
+# pt1 <- as.matrix(pt1[,c('x','y')])
+# getDirectionalCostMatrix(data0=pt0, pt1, digits=1, maxDist=150, direction=c(1,0), perpendicularPenaltyFactor=10)
+
+
+psl <- new('PointSetList')
+psl$initializeWithJEXROIFile(path ='/Users/jaywarrick/Documents/MMB/Projects/Adhesion/TesterMaxima/x0_y0.jxd')
+psl$track(trackingStart='last', trackingEnd='first', trim = F, directionalLinearAssignment, digits=1, maxDist=100, direction=c(1,0), perpendicularPenaltyFactor=10, uniformityDistThresh=3)
+tl <- psl$getTrackList()
+save(tl, file='~/Desktop/tl.Rdata')
+load(file='~/Desktop/tl.Rdata')
+tl <- tl$copy()
+tl$refreshTracks()
+tl$filterTracks(trackLengthFilter, min=3)
+setOscillatoryMeta(trackList=tl, sin=F, fi=1, ff=0.01, t0_Frame=1, timePerFrame=0.035, sweepDuration=300)
+fit <- getBulkPhaseShiftGS(tl, ti=seq(-1,1,1/30), phaseShift=seq(-pi,pi,pi/30), cores=1)
+windowWidths <- getWindowWidths(tl, fit, dist=10, maxWidth=15)
+tl$calculateSmoothedData(windowWidths=windowWidths, slots=c('vx','vy'), suffix='s')
+tl$plotTrackList(slotX='t', slotY='vxs', ylim=c(-1000,1000))
+validFrames <- calculateValidFrames(tl, fit, validStart=0.25, validEnd=0.75)
+tl$setSelectedFrames(validFrames)
+duh <- getPercentAdhered(tl, velocityThreshold = 3)
+plot(duh$time, duh$percentAdhered)
+

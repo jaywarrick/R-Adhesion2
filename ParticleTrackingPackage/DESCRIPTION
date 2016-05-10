@@ -10,14 +10,15 @@ LazyData: TRUE
 Collate:
     ParticleTracking.R
     LAPJV.R
-    Tracking.R
     PackageFunctions.R
-    Maxima.R
-    MaximaList.R
+    PointSet.R
+    PointSetList.R
     Track.R
     TrackList.R
     TrackFilters.R
     TrackFitting.R
+    Tracking2.R
+    TrackCalculations.R
 Imports:
     methods,
     foreign,

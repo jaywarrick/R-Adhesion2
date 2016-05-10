@@ -16,11 +16,11 @@ NULL
 #' t0_Frame numeric The frame associated with time=0 of the sweep
 #' timePerFrame numeric The time per frame of the data in seconds
 #' sweepDurtion numeric The time duration of the sweep in seconds
-#' tAll numeric vector The vector of times associate with 'allFrames'
+#' allTimes numeric vector The vector of times associate with 'allFrames'
 #' allFrames numeric vector The vector containing a complete list of frame numbers existing in the data set
-#' validFrames numeric vector The subset of 'allFrames' which are set as valid using 'setValidFrames'
+#' selectedFrames numeric vector The subset of 'allFrames' which are set as valid using 'setSelectedFrames'
 TrackList <- setRefClass('TrackList',
-					fields = list(tracks='list', meta='list'), #sin='logical', fi='numeric', ff='numeric', phaseShift='numeric', t0_Frame='numeric', timePerFrame='numeric', sweepDuration='numeric', tAll='numeric', allFrames='numeric', validFrames='numeric'
+					fields = list(tracks='list', meta='list'), #sin='logical', fi='numeric', ff='numeric', phaseShift='numeric', t0_Frame='numeric', timePerFrame='numeric', sweepDuration='numeric', allTimes='numeric', allFrames='numeric', selectedFrames='numeric'
 					methods = list(
 						initializeWithJEXROIFile = function(file=NULL, t0_Frame, timePerFrame)
 						{
@@ -38,61 +38,50 @@ TrackList <- setRefClass('TrackList',
 								newTrack <- new('Track')
 								newTrack$initializeWithTrackROI(id=id, start=start, pattern=pattern, t0_Frame=t0_Frame, timePerFrame=timePerFrame)
 								setTrack(newTrack)
-								frameLimits <- range()
 							}
 						},
-						setStandardMeta = function(t0_Frame=t0_Frame, timePerFrame=timePerFrame)
+						setSelectedFrames = function(selectedFrames)
 						{
-						     "Set the 'standard' metadata for a TrackList object which typically consists
-						     of a frame for which the time is equal to 0 (t0_Frame) and the amount
-						     of time between each frame (timePerFrame)."
-							meta <<- list()
-							meta$t0_Frame <<- t0_Frame
-							meta$timePerFrame <<- timePerFrame
-							calculateAllFrames()
-							calculateTAll()
-							calculateVelocities()
-							callTrackFun('setMeta', meta)
-						},
-						setOscillatoryMeta = function(sin, fi, ff, t0_Frame, timePerFrame, sweepDuration)
-						{
-							"Set the sweep parameters used to predict particle motion during a log frequency sweep\n
-							@param sin boolean Whether the tracks are sinusoidal or triangular\n
-							@param fi numeric The initial frequency of the sweep\n
-							@param ff numeric The final frequency of the sweep\n
-							@param t0_Frame numeric The frame associated with time=0 of the sweep\n
-							@param timePerFrame numeric The time per frame of the data in seconds\n
-							@param sweepDurtion numeric The time duration of the sweep in seconds\n
-							The phase shift is not set here as that is determined using the getBulkPhaseShift method"
+						     "Set which frames are 'selected'. Many functions have the ability to operate on only
+						     the 'selected' frames of each track etc. This can be used to set which frames those are.\n
+						     @param selectedFrames numeric vector of frame numbers that are 'valid'"
 
-							meta <<- list()
-							meta$sin <<- sin
-							meta$fi <<- fi
-							meta$ff <<- ff
-							meta$t0_Frame <<- t0_Frame
-							meta$timePerFrame <<- timePerFrame
-							meta$sweepDuration <<- sweepDuration
-							calculateAllFrames()
-							calculateTAll()
-							calculateVelocities()
-							callTrackFun('setMeta', meta)
+						     meta$selectedFrames <<- selectedFrames
 						},
-						length = function()
+						getSelectedFrames = function()
+						{
+						     "Set which frames are 'selected'. Many functions have the ability to operate on only
+						     the 'selected' frames of each track etc. This can be used to set which frames those are.
+                                   If the selected frames have not been set, then the function returns the 'allFrames'
+                                   value stored in the 'meta' list field.\n
+						     @param selectedFrames numeric vector of frame numbers that are 'valid'"
+
+						     if(is.null(meta$selectedFrames))
+						     {
+						          return(meta$allFrames)
+						     }
+						     else
+						     {
+						          return(meta$selectedFrames)
+						     }
+						},
+						trackCount = function()
 						{
 							"Return the number of tracks in this TrackList"
 
 							return(base::length(tracks))
 						},
-						plotTrackList = function(slot='vx', fun=NULL, rel=FALSE, ...)
+						plotTrackList = function(slotX='frame', slotY='x', fun=NULL, rel=FALSE, ...)
 						{
 							"Plot all the values of the provided 'slot' for all tracks on a single plot.\n
-							@param slot string Name of the column within the Track$points to plot on the Y-axis (options are x, y, t, frame, vx, vy and potentially vxs and vys smoothed velocities, X-axis is always 't' with this function)\n
+							@param slotX string Name of the column within the Track$pts to plot on the X-axis (e.g., x, y, t, frame, vx, vy and potentially vxs and vys smoothed velocities)\n
+                                   @param slotY string Name of the column within the Track$pts to plot on the Y-axis (e.g., x, y, t, frame, vx, vy and potentially vxs and vys smoothed velocities)\n
 							@param fun function A function to transform the slot data from each track before plotting (e.g., to scale between pixels per second velocity to microns per second velocity)\n
 							@param rel boolean Whether to plot the slot relative to its mean"
 
-							xRanges <- getProp(fun=function(track){track$range('t')})
+							xRanges <- applyFun_Return(fun=function(track){track$range(slot=slotX)})
 							xRanges <- matrix(unlist(xRanges), ncol=2, byrow=TRUE)
-							yRanges <- getProp(fun=function(track){track$range(slot)})
+							yRanges <- applyFun_Return(fun=function(track){track$range(slot=slotY)})
 							yRanges <- matrix(unlist(yRanges), ncol=2, byrow=TRUE)
 
 							Xmin <- min(xRanges[,1], na.rm=TRUE)
@@ -119,18 +108,18 @@ TrackList <- setRefClass('TrackList',
 								ylim <- args$ylim
 								args$ylim <- NULL
 							}
-							print(args)
+							# print(args)
 							first <- TRUE
-							for(track in tracks)
+							for(.track in tracks)
 							{
 								if(first)
 								{
-									do.call(track$plotTrack, c(list(slotY=slot, funY=fun, relY=rel, add=F, xlim=xlim, ylim=ylim, withTitle=FALSE, main='All Tracks'), args))
+									do.call(.track$plotTrack, c(list(slotX=slotX, slotY=slotY, funY=fun, relY=rel, add=F, xlim=xlim, ylim=ylim, withTitle=FALSE, main='All Tracks'), args))
 									first = FALSE
 								}
 								else
 								{
-									do.call(track$plotTrack, c(list(slotY=slot, funY=fun, relY=rel, add=T), args))
+									do.call(.track$plotTrack, c(list(slotX=slotX, slotY=slotY, funY=fun, relY=rel, add=T), args))
 								}
 							}
 						},
@@ -157,22 +146,7 @@ TrackList <- setRefClass('TrackList',
 
 							tracks[[as.character(id)]] <<- NULL
 						},
-						getProp = function(fun=function(x){return(x$length())}, ...)
-						{
-							"Apply the given function to all tracks, summarizing the results in a list\n
-							@param id numeric the ID number of the track of interest"
-
-							temp <- lapply(tracks, FUN=fun, ...)
-							names(temp) <- names(tracks)
-							return(temp)
-							#    ret <- list()
-							#    for(.track in tracks)
-							#    {
-							#         ret[[as.character(.track$id)]] <- fun(.track, ...)
-							#    }
-							#    return(ret)
-						},
-						addTrackPoint = function(id, x, y, frame)
+						addTrackPoint = function(id, frame, ...)
 						{
 							"Add the given point (x, y, frame) to the track associated with the provided ID
 							This is useful for building a TrackList one point at a time instead via initialization with a file\n
@@ -188,85 +162,105 @@ TrackList <- setRefClass('TrackList',
 								track$id <- id
 								# track$.parent <- .self # setTrack resets .parent
 							}
-							track$addPoint(x=x, y=y, t=(frame-meta$t0_Frame)*meta$timePerFrame, frame=frame)
+							track$addPoint(frame=frame, ...)
 							setTrack(track)
 						},
-						calculateAllFrames = function()
+						applyFun_Return = function(fun=function(x){return(x$frameCount())}, ...)
 						{
-							"Calculate the complete ordered list of frames that exist within the TrackList
-						     and set that information in the metadata object as 'allFrames'"
+						     "Apply the given function to all tracks, summarizing the results in a list by Track id\n
+							@param id numeric the ID number of the track of interest
+						     @param ... additional args passed to fun"
 
-							possibleFrames <- c()
-							for(.track in tracks)
-							{
-								possibleFrames <- c(possibleFrames, .track$getSlot('frame'))
-							}
-							meta$allFrames <<- sort(unique(possibleFrames))
+						     temp <- lapply(tracks, FUN=fun, ...)
+						     names(temp) <- names(tracks)
+						     return(temp)
 						},
-						calculateTAll = function()
+						applyFun_Replace = function(fun, ...)
 						{
-							"Calculate the times associated with each frame that exists within the TrackList
-						     and set that information in the metadata object as 'tAll'"
-
-							print('Calculating times for all frames in TrackList')
-							meta$tAll <<- (meta$allFrames - meta$t0_Frame) * meta$timePerFrame
-						},
-						calculateVelocities = function()
-						{
-							"Call the 'calulateVelocities' method on all Track objects in the TrackList
-						     This results in calculating the point-to-point instantaneous velocities of each track (i.e., no smoothing)"
-
-							callTrackFun('calculateVelocities')
-						},
-						smoothVelocities = function(fit, dist, maxWidth)
-						{
-							"Call the 'smoothVelocities' method on all the Track objects in the TrackList\n
-							@param fit The fit results returned from 'getBulkPhaseShift' fitting function\n
-							@param dist numeric The number of pixels of motion that should be observed before estimating the velocity"
-
-							tempAllWidths <- getWindowWidths(fit=fit, dist=dist, maxWidth=maxWidth)
-							callTrackFun('smoothVelocities', allWidths=tempAllWidths, allFrames=meta$allFrames)
-						},
-						calculateValidTimes = function()
-						{
-							"Calculate the times associated with the valid frames of this TrackList
-						     and return that information directly"
-
-							return(meta$tAll[meta$allFrames %in% meta$validFrames])
-						},
-						applyToTracks = function(fun, ...)
-						{
-							"Apply the provided function to alter each track, replacing the exisitng tracks with the altered tracks\n
+							"Apply the provided function to alter each track, replacing the existing tracks with the altered tracks\n
 							@param fun function The function to apply\n
 							@param ... additional arguments to pass to fun"
 
-							for(track in tracks)
+							for(.track in tracks)
 							{
-								track <- fun(track, ...)
+								.track <- fun(.track, ...)
 							}
+						},
+						applyFun_Void = function(funName, ...)
+						{
+						     "Apply the provided function to each track. Intended for 'void' functions that will produce
+                                   and action such as adding the information for each track to a plot.\n
+							@param fun function The function to apply\n
+							@param ... additional arguments to pass to fun"
+
+						     temp <- lapply(tracks, FUN=fun, ...)
 						},
 						callTrackFun = function(funName, ...)
 						{
-							"Call a Track method/function on each track in the TrackList\n
+						     "Call a Track method/function on each track in the TrackList (e.g., plotting functions)\n
 							@param funName string The name of the Track function to call on each Track\n
 							@param ... additional arguments to pass to the called function"
 
-							tot <- length()
-							myCount <- 0
-							for(track in tracks)
-							{
-							     myCount <- myCount + 1
-								cat("Calling", funName, "on track", myCount, "of", tot, "\n")
-								# Have to do eval(parse()) because track[[funName]] is NULL while track$parsedFunName is not NULL, don't know why
-								# Now that the function is loaded we can call it using the [[]] method
-								theCall <- paste("track$'", funName, "'", sep="")
-								theFunc <- eval(parse(text=theCall))
-								if(is.null(theFunc))
-								{
-									stop(cat("Couldn't find function with name",funName))
-								}
-								do.call(theFunc, list(...))
-							}
+						     tot <- trackCount()
+						     myCount <- 0
+						     for(.track in tracks)
+						     {
+						          myCount <- myCount + 1
+						          cat("Calling", funName, "on track", myCount, "of", tot, "\n")
+						          # Have to do eval(parse()) because track[[funName]] is NULL while track$parsedFunName is not NULL, don't know why
+						          # Now that the function is loaded we can call it using the [[]] method
+						          theCall <- paste(".track$'", funName, "'", sep="")
+						          theFunc <- eval(parse(text=theCall))
+						          if(is.null(theFunc))
+						          {
+						               stop(cat("Couldn't find function with name",funName))
+						          }
+						          do.call(theFunc, list(...))
+						     }
+						},
+						updateFramesAndTimes = function(t0_Frame, timePerFrame)
+						{
+						     "Calculate the complete ordered list of frames that exist within the TrackList
+						     and set that information in the metadata object as 'allFrames'.\n
+						     Store the t0_Frame and timePerFrame information in the 'meta' list field of the TrackList.
+						     The t0_Frame is the frame for which the time is equal to 0 and the amount
+						     of time between each frame is the timePerFrame. From this information, the time
+						     associated with each frame is determined as well as the time derivatives
+						     of each measure.\n
+						     Given the frames in the TrackList, t0_Frame, and timePerFrame, we can calculate
+						     the times associated with each frame that exists within the TrackList
+						     and set that information in the metadata object as 'allTimes'. This also
+						     causes a call to 'updateTimes' on each track with the appropriate"
+
+						     possibleFrames <- c()
+						     for(.track in tracks)
+						     {
+						          possibleFrames <- c(possibleFrames, .track$getSlot('frame'))
+						     }
+						     meta$t0_Frame <<- t0_Frame
+						     meta$timePerFrame <<- timePerFrame
+						     meta$allFrames <<- sort(unique(possibleFrames))
+							meta$allTimes <<- (meta$allFrames - meta$t0_Frame) * meta$timePerFrame
+							callTrackFun('updateTimes', t0_Frame=t0_Frame, timePerFrame=timePerFrame)
+						},
+						calculateDerivatives = function(slots, withRespectTo='t', prefix='v')
+						{
+							"Call the 'calulateDerivatives' method on all Track objects in the TrackList"
+
+							callTrackFun('calculateDerivatives', slots=slots, withRespectTo=withRespectTo, prefix=prefix)
+						},
+						calculateSmoothedData = function(windowWidths, slots, suffix='s')
+						{
+						     "Smooth the specified slots in each track using the specified windowWidths
+                                   saving the calculations into each track using the slot name appended by the
+                                   the supplied suffix.\n
+                                   @param windowWidths data.frame(frame=numeric, width=numeric) containing an window width for each frame that exists in the list of Track objects or a single number that will be applied to all frames for all Track objects.\n
+                                   @param slots character vector of all the columns in the 'pts' data.frame field for which smoothed versions of the data should be calculated."
+
+						     for(.track in tracks)
+						     {
+						          .track$calculateSmoothedData(windowWidths=windowWidths, slots=slots, suffix=suffix)
+						     }
 						},
 						filterTracks = function(fun, ...)
 						{
@@ -280,198 +274,64 @@ TrackList <- setRefClass('TrackList',
 								message("No tracks fit filter, resulting tracklist is of length 0!")
 							}
 						},
-						sortTracks = function(fun=function(x){return(x$length())}, decreasing=TRUE, ...)
+						sortTracks = function(fun=function(x){return(x$frameCount())}, decreasing=TRUE, ...)
 						{
 							"Sort the track according to the function provided. The function should
 							take a track as its first argument and return a sortable value for sorting
 							The tracks are then sorted in the TrackList based on these values\n
-							@param fun function The function to determine a value for sorting tracks - default=function(x){return(x$length())} (thus sorting by length)\n
+                                   @param fun function The function to determine a value for sorting tracks
+                                   [default=function(x){return(x$frameCount())} (thus sorting by length)]\n
 							@param decreasing boolean whether to sort in increasing or decreasing order"
 
-							ret <- getProp(fun=fun, ...)
+							ret <- applyFun_Return(fun=fun, ...)
 							sorted <- sort(unlist(ret), index.return=T, decreasing=decreasing)
 							tracks <<- tracks[sorted$ix]
 						},
-						getMatrix = function(slot='vx', validOnly=FALSE, rel=FALSE)
+						getMatrix = function(slot='vx', selectedOnly=FALSE, rel=FALSE)
 						{
 							"Get a matrix of the tracklist data. Track id's are rows while
 							frame numbers are columns. Use the matrix form of TrackList to do
 							bulk operations such as determining the sse of all the data to a
 							single curve.\n
-							@param slot string The name of the column in Track$points for which to make a matrix of data for\n
-							@param validOnly boolean whether to make the matrix for valid frames only - defualt=FALSE"
+							@param slot string The name of the column in Track$pts for which to make a matrix of data for\n
+							@param selectedOnly boolean whether to make the matrix for valid frames only - defualt=FALSE"
 
-							if(!validOnly)
+							if(selectedOnly)
 							{
-								frames <- meta$allFrames
+							     frames <- meta$selectedFrames
 							}
 							else
 							{
-								frames <- meta$validFrames
+							     frames <- meta$allFrames
 							}
 							ids <- names(tracks)
 							data <- matrix(NA, base::length(ids), base::length(frames), dimnames=list(id=names(tracks), frame=as.character(frames)))
 							for(track in tracks)
 							{
-								data[as.character(track$id), as.character(track$getSlot(slot='frame', rel=rel, validOnly=validOnly))] <- track$getSlot(slot=slot, rel=FALSE, validOnly=validOnly)
+							     if(selectedOnly)
+							     {
+							          data[as.character(track$id), as.character(track$getSlot(slot='frame', rel=FALSE, selectedFrames=frames))] <- track$getSlot(slot=slot, rel=rel, selectedFrames=frames)
+							     }
+							     else
+							     {
+							          data[as.character(track$id), as.character(track$getSlot(slot='frame', rel=FALSE, selectedFrames=NULL))] <- track$getSlot(slot=slot, rel=rel, selectedFrames=NULL)
+							     }
 							}
 							return(data)
 						},
-						getWindowWidths = function(fit, dist, maxWidth)
-						{
-							"Calculate the appropriate window widths for calculating velocity\n
-							@param fit The fit results returned by 'getBulkPhaseShift'\n
-							@param dist The number of pixels that we would like to see (if possible) the particle/cell move before estimating velocity\n
-							@param maxWidth numeric The maximum number of FRAMES that should be averaged together to estimate velocity (i.e., averaging is good up to a point where it just increases compuation time)\n\n
-							Underlying Calculations: v represents the velocity calculated over a single period. Thus, the cell should travel
-							4*A units of distance per period. This is used to estimate the velocity of the cell
-							using the fit. Therefore, the expected distance the cell will travel between frames is
-							v*dt where dt is the time between the frames of interest. Thus, if we would like to
-							quantify velocity over a travel distance of 10 pixels (i.e., dist=10), then we can take
-							dist/v*dt to get the number of frames (i.e., dt's) needed to cover 10 pixels. However, if maxWidth
-							is exceeded, maxWidth is returned. dt could be variable over time depending on frame sampling rates etc.
-							approximate a dt for each index based on diff's. Repeat last value at end to create a dt
-							vector that is the same as the tracks$tAll vector"
-							dt <- diff(meta$tAll)
-							dt <- c(dt, last(dt))
-							v <- 4*fit$par[['amplitude']]*(meta$fi*(meta$ff/meta$fi)^(meta$tAll/last(meta$tAll)))
-							widths <- ceiling(dist/(v*dt))
-							widths[widths > maxWidth] <- maxWidth
-							return(widths)
-						},
-						calculateTrackAverage = function(slot = 'vx', rel=FALSE, validOnly=FALSE)
+						calculateAvgPerFrameAcrossTracks = function(slot = 'vx', rel=FALSE, selectedOnly=FALSE)
 						{
 						     "Calculate the average value of a track slot such as x, y, vx, vxs, vy, and vys
 						     return it as a vector."
+                                   if(selectedOnly)
+                                   {
+                                        return(colMeans(getMatrix(slot=slot, rel=rel, selectedFrames=meta$selectedFrames)))
+                                   }
+						     else
+						     {
+						          return(colMeans(getMatrix(slot=slot, rel=rel, selectedFrames=meta$allFrames)))
+						     }
 
-						     return(colMeans(getMatrix(slot=slot, rel=rel, validOnly=validOnly)))
-						},
-						calculateValidFrames = function(fit, validStart=0.01, validEnd=0.99)
-						{
-							"Takes the fit and determines where the cells switch directions\n
-                                   'validStart' and 'validEnd' represent precentages. In other words, after the switch in direction,
-							valid points start at 'validStart' % of the way to the next switch in direction while 'validEnd'
-							occurs 'validEnd' % of the way to the that same next switch in direction.\n
-
-							This filter is good for removing inaccurate values of the velocity when using a triangle waveform because
-							the estimate of velocity will be artificially be lower due to sample aliasing of particle motion.
-							Possible values are 0, 1, 2, and 3 for inflectionPtsToFilter. Multiple at once can be provided.\n
-
-							0 Represents the upward zero-crossing of the position and max positive velocity\n
-							1 Represents the max position and downward zero-crossing of the velocity\n
-							2 Represents the downward zero-crossing of the position and min (i.e most negative) velocity\n
-							4 Represents the min (i.e., most negative) position and upward zero-crossing of the velocity\n
-
-                                   'inflectionPtsToFilter' refers to the first point of the numbered sections (i.e., 1 refers to the max point)
-							Thus if 1 is included in 'inflectionPtsToFilter', points adjacent to this point will be considered for wobble and filtered.\n
-
-                                   We use 'inflectionPtsToFilter' of c(1,3) to mark the points at which the flow switches direction"
-
-							# Helper function: get data points adjacent to specified inflection timepoint
-							getNearests <- function(t, inflectionPoint)
-							{
-								upper <- which.max((t-inflectionPoint) >= 0)
-								if(is.na(upper) || upper == 1)
-								{
-									return(NA)
-								}
-								lower <- upper - 1
-								return(c(lower, upper))
-							}
-
-							sweep <- getSweep(amplitude=fit$par['amplitude'], phaseShift=fit$par['phaseShift'], offset=0, sin=meta$sin, fi=meta$fi, ff=meta$ff, sweepDuration=meta$sweepDuration, t=meta$tAll, guess=NULL)
-							inflectionsToAddress <- sweep$inflectionNums %in% c(1,3) # These are times at which flow switches directions
-							indicesToRemove <- numeric(0)
-							for(i in which(inflectionsToAddress))
-							{
-								nearests <- getNearests(sweep$t, sweep$inflections[i])
-								if(!is.na(nearests)[1])
-								{
-									indicesToRemove <- c(indicesToRemove, nearests)
-								}
-							}
-							validFrames0 <- meta$allFrames
-							validFrames0 <- validFrames0[-indicesToRemove]
-
-							validFrames1 <- numeric(0)
-							for(tIndex in 1:base::length(meta$tAll))
-							{
-								# Get the nearest inflection at or beyond this time
-
-								infIndex <- which.max((sweep$inflections >= meta$tAll[tIndex]) & inflectionsToAddress)
-								if(is.na(infIndex)) next
-
-								# Get the bounding inflections that represent changes in fluid direction
-								infT2 <- sweep$inflections[infIndex] # take the inflection we found
-								if((infIndex-2) < 1)
-								{
-									infT1 <- 0
-								}
-								else
-								{
-									infT1 <- sweep$inflections[infIndex-2] # also take two inflections prior because each inflection represents pi/2 and we want to go back to the last change in direction which is pi ago.
-								}
-								dInfT <- infT2-infT1 # define the time interval size between these two inflections
-
-								# Within the if statement calculate the fractional location of this time index in the interval between the two inflections.
-								if( (meta$tAll[tIndex] >= (infT1 + validStart*dInfT)) & (meta$tAll[tIndex] <= (infT1 + validEnd*dInfT)) )
-								{
-									# If it is within the startValid and endValid bounds, add it to the list of the valid frames
-									validFrames1 <- c(validFrames1, meta$allFrames[tIndex]) # (tIndex-1) = frame because frames are indices that start at 0
-								}
-							}
-
-							meta$validFrames <<- sort(intersect(validFrames1, validFrames0))
-
-							for(track in tracks)
-							{
-								track$setValidFrames(meta$validFrames)
-							}
-						},
-						getPercentAdhered = function(velocityThreshold=3)
-						{
-							"Calculate the percent adhered at each timepoint using the provided velocity threshold
-                                   @param velocityThrehsold numeric The pixels per second below which (exclusive) a cell is considered adhered - default=3 [pixels/second]\n
-							@return Return a dataframe with columns of 'time' and 'percentAdhered'"
-
-							trackMatrix <- getMatrix(slot='vx', validOnly=TRUE, rel=FALSE)
-							ret <- list()
-							cellCount <- getCellCount()
-							frames <- colnames(trackMatrix)
-							for(frame in frames)
-							{
-								velocities <- trackMatrix[,frame]
-								velocities <- abs(velocities[!is.na(velocities)])
-								if(!isempty(velocities))
-								{
-									adhered <- sum(velocities < velocityThreshold)/cellCount
-									ret[[frame]] <- adhered
-								}
-								else
-								{
-									ret[[frame]] <- 0
-								}
-							}
-							percents <- 100*as.numeric(ret)
-							times <- meta$tAll[meta$allFrames %in% frames]
-							return(data.frame(time=times, percentAdhered=percents))
-						},
-						getCellCount = function()
-						{
-						     "Return the number cells/tracks in the TrackList object"
-
-							trackMatrix <- getMatrix(slot='vx', validOnly=TRUE)
-							if(base::length(trackMatrix) == 0 || nrow(trackMatrix) == 0)
-							{
-								return(0)
-							}
-							else
-							{
-								ret <- list()
-								frames <- colnames(trackMatrix)
-								lastFrame <- last(frames)
-								return(sum(!is.na(trackMatrix[,lastFrame])))
-							}
 						},
 						save = function(objectName, file) {
 							"Save the current object on the file in R external object format."
@@ -488,7 +348,7 @@ TrackList <- setRefClass('TrackList',
 
 							for(.track in tracks)
 							{
-								tracks[.track$id] <<- .track$copy()
+								tracks[as.character(.track$id)] <<- .track$copy()
 							}
 						}
 					)
@@ -501,3 +361,21 @@ last <- function(x)
 {
 	return(x[numel(x)])
 }
+
+# calculateTrackCounts = function()
+# {
+#      "Return the number of tracks in the TrackList object"
+#
+#      trackMatrix <- getMatrix(slot='vx', selectedOnly=TRUE)
+#      if(base::length(trackMatrix) == 0 || nrow(trackMatrix) == 0)
+#      {
+#           return(0)
+#      }
+#      else
+#      {
+#           ret <- list()
+#           frames <- colnames(trackMatrix)
+#           lastFrame <- last(frames)
+#           return(sum(!is.na(trackMatrix[,lastFrame])))
+#      }
+# }

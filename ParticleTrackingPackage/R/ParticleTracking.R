@@ -20,8 +20,8 @@
 #' specific driving functions. These will likely be less useful to most people but hopefully
 #' the base classes are useful to others doing particle tracking.
 #'
-#' @seealso \code{\link{Maxima}}
-#' @seealso \code{\link{MaximaList}}
+#' @seealso \code{\link{PointSet}}
+#' @seealso \code{\link{PointSetList}}
 #' @seealso \code{\link{Track}}
 #' @seealso \code{\link{TrackList}}
 "_PACKAGE"
