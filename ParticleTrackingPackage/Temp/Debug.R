@@ -40,11 +40,17 @@ tl$refreshTracks()
 tl$filterTracks(trackLengthFilter, min=3)
 setOscillatoryMeta(trackList=tl, sin=F, fi=1, ff=0.01, t0_Frame=1, timePerFrame=0.035, sweepDuration=300)
 fit <- getBulkPhaseShiftGS(tl, ti=seq(-1,1,1/30), phaseShift=seq(-pi,pi,pi/30), cores=1)
+tl$meta$ti <- fit$par['ti'] # save the time offset for this trackList
+tl$meta$amplitudeGuess <- fit$par['amplitude'] # save the guess for the average amplitude of this trackList
 windowWidths <- getWindowWidths(tl, fit, dist=10, maxWidth=15)
 tl$calculateSmoothedData(windowWidths=windowWidths, slots=c('vx','vy'), suffix='s')
 tl$plotTrackList(slotX='t', slotY='vxs', ylim=c(-1000,1000))
 validFrames <- calculateValidFrames(tl, fit, validStart=0.25, validEnd=0.75)
 tl$setSelectedFrames(validFrames)
 duh <- getPercentAdhered(tl, velocityThreshold = 3)
-plot(duh$time, duh$percentAdhered)
+plot(duh$time, duh$percentAdhered, pch=20, cex=0.5, col=rgb(0,0,0,0.5))
+trackEnds <- tl$getPointSetListOfTrackEnds(slots=c('x','y','t'))
 
+sseTrack(tl, tl$getTrack(6), slot='vxs', amplitude=40, velocityThresh=3, selectedOnly=T)
+
+getTrackAmplitude(tl, tl$getTrack(6), slot)

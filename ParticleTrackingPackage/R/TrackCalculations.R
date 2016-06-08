@@ -10,7 +10,7 @@
 #' dist/v*dt to get the number of frames (i.e., dt's) needed to cover 10 pixels. However, if maxWidth
 #' is exceeded, maxWidth is returned. dt could be variable over time depending on frame sampling rates etc.
 #' approximate a dt for each index based on diff's. Repeat last value at end to create a dt
-#' vector that is the same as the tracks$meta$allTimes vector
+#' vector that is the same as the trackList$meta$allTimes vector
 #'
 #' @param trackList TrackList object for which to calculate appropriate window widths
 #' @param fit The fit results returned by 'getBulkPhaseShift'
@@ -146,9 +146,8 @@ smoothData <- function(x, windowWidth=2)
 #' Get the adjustable running window average of the data
 #'
 #' @param i The index within 'frames' at which to calculate an average over a window centered at this location
-#' @param frames The frames in this track
 #' @param windowWidth A vector of window widths appropriate for each frame in the 'frames' of this track
-#' @param data The vector of data for which we will calculate the windowed averages
+#' @param x The vector of data for which we will calculate the windowed averages
 #'
 #' @export
 smoothPt <- function(i, windowWidth, x)
@@ -188,7 +187,7 @@ getPercentAdhered <- function(trackList, slot='vxs', velocityThreshold=3, window
      trackMatrix <- trackList$getMatrix(slot=slot, selectedOnly=TRUE, rel=FALSE)
      ret <- list()
 
-     if(is.null(tl$getSelectedFrames()))
+     if(is.null(trackList$getSelectedFrames()))
      {
           stop("The selected frames of this TrackList must be set first. See 'setSelectedFrames' of the TrackList class.")
      }

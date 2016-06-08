@@ -51,7 +51,6 @@ setOscillatoryMeta <- function(trackList, sin, fi, ff, t0_Frame, timePerFrame, s
      trackList$meta$sweepDuration <- sweepDuration
      trackList$updateFramesAndTimes(t0_Frame=t0_Frame, timePerFrame=timePerFrame)
      trackList$calculateDerivatives(slots=c('x','y'))
-     trackList$callTrackFun('setMeta', trackList$meta)
 }
 
 #' calculateValidTimes
@@ -66,86 +65,117 @@ calculateValidTimes <- function(trackList)
      return(trackList$meta$allTimes[meta$allFrames %in% meta$selectedFrames])
 }
 
-# # sseTrack
-# #
-# # Calculates the sum square error (i.e., sse) between this track and a sweep function with the
-# # given 'amplitude', 'phaseShift',and 'offset'. The additional sweep parameters of sin, allTimes, fi
-# # and ff are passed on from this Track objects meta data field, which is why this convenience
-# # function was created.
-# #
-# # @param amplitude numeric value indicating the amplitude used in the 'getSweep' function
-# # @param phaseShift numeric value indicating the phaseShift used in the 'getSweep' function
-# # @param offset numeric value indicating the offset used in the 'getSweep' function
-# # @param selectedFramesOnly A boolean to limit the calculation to just the 'selectedFrames' listed in this Track object
-# #
-# # @export
-# sseTrack <- function(track, amplitude=50, phaseShift=0, offset=0, selectedFramesOnly=FALSE)
-# {
-#      if(selectedFramesOnly)
-#      {
-#           frames <- selectedFrames
-#      }
-#      else
-#      {
-#           frames <- track$pts$frame
-#      }
-#      args <- list(sin=meta$sin, fi=meta$fi, ff=meta$ff, allTimes=meta$allTimes, amplitude=amplitude, offset=offset, frames=frames)
-#      args <- args[!isempty(args)]
-#      predicted <- do.call(getSweep, args)
-#      data <- object$pts$vx                ### Explicitly fitting vx ###
-#      indicesToGet <- which(track$pts$frame %in% frames)
-#      result <- sum((data[indicesToGet]-predicted$v)^2)
-#      return(result)
-# }
-
-#' sseBulk
+#' sseTrack
 #'
-#' @param trackList A TrackList object
-#' @param trackMatrix The trackMatrix of the TrackList object (so it doesn't need to be calculated for every call to this function)
-#' @param amplitude A numeric value of the amplitude of the sweep function.
-#' @param phaseShift A numeric value of the phase shift of the sweep function.
-#' @param timeScalingFactor A numeric value of the time scaling factor
-#' @param ti A numeric value of the initial time of the first frame
+#' Calculate the sum square error between a log descending frequency sweep and the given track. The
+#' sweep is calculated using the given parameters (amplitude) and the parameters contained within the TrackList 'meta'
+#' field (sin, amplitudeGuess, ti, fi, ff, sweepDuration, allTimes).
 #'
-#' @return the sum square error between the TrackList data and a sweep with the provided amplitude and phaseShift
+#' The velocity threshold can be used to only consider points that are above a certain velocity (or
+#' technically 'speed' as the test is if(abs(velocity) > velocityThresh).
+#'
+#' If there are no points to be considered for this track, then the track must be for an adhered
+#' particle and the amplitude should be 0. Therefore the sse is calculated as amplitude^2, pushing
+#' the associated fitting process to fit with an amplitude of 0.
+#'
+#' @param trackList TrackList object that is the parent of the provided track object, containing meta data described in the description above.
+#' @param track Track object for which to calculate the sse
+#' @param slot character value indicating which velocity to compare the sweep calculation with (defualt = 'vx')
+#' @param amplitude numeric value of the amplitude of the sweep to compare with this track
+#' @param velocityThresh numeric value explained in description (default = -1, i.e., don't apply a threshold)
+#' @param selectedOnly logical value indicating whether to only compare selected frames of the TrackList if available. If not available, all frames in the track are considered.
 #'
 #' @export
-sseBulk <- function(trackList, trackMatrix, amplitude, phaseShift, timeScalingFactor, ti)
+sseTrack <- function(trackList, track, slot='vx', amplitude, velocityThresh=-1, selectedOnly=T)
 {
-     # Cols are frames, rows are track ids
-     # we pass the 'trackMatrix' so we don't have to obtain it each iteration
-
-     # get the sweep (for this we need the 'trackList')
-     sweep <- getSweep(amplitude=amplitude, phaseShift=phaseShift, offset=pi, sin=trackList$meta$sin, ti=ti, fi=trackList$meta$fi, ff=trackList$meta$ff, sweepDuration=timeScalingFactor*trackList$meta$sweepDuration, t=trackList$meta$allTimes, guess=NULL)
-     # For each index in allTimes (i.e., for each frame)
-     sse <- sum((t(trackMatrix)-sweep$v)^2, na.rm=TRUE) # Do the transpose because the subtract function typically makes the subtracted vector vertical
-     cat("(", amplitude, ",", timeScalingFactor, ",", ti, ") = ", sse, "\n", sep="")
-     return(sse)
+     if(selectedOnly)
+     {
+          selectedFrames <- trackList$getSelectedFrames()
+     }
+     else
+     {
+          selectedFrames <- trackList$meta$allFrames
+     }
+     predicted <- getSweep(amplitude=amplitude, phaseShift=0, offset=0, sin=trackList$meta$sin, ti=trackList$meta$ti, fi=trackList$meta$fi, ff=trackList$meta$ff, sweepDuration=trackList$meta$sweepDuration, t=trackList$meta$allTimes, guess=NULL, calcVelocity=TRUE, flipped=TRUE)
+     fitPts <- track$pts[abs(track$pts[,slot]) > velocityThresh & track$pts$frame %in% selectedFrames,]
+     if(nrow(fitPts) == 0)
+     {
+          # Then the track is probably for a 'stationary' particle and the amplitude should be 0
+          return((trackList$meta$fit$par['amplitude'])^2)
+     }
+     indicesToGet <- which(trackList$meta$allFrames %in% fitPts$frame)
+     result <- sum((predicted$v[indicesToGet]-fitPts[,slot])^2)
+     return(result)
 }
 
-#' seBulkGS
+#' getTrackAmplitude
 #'
-#' @param x default
-#' @param trackList default
-#' @param trackMatrix default
-#' @param amplitude default
-#' @param timeScalingFactor default
+#' Find the best amplitude of the sweep function that fits the track
 #'
-#' @return the sum square error between the TrackList data and a sweep with the provided amplitude and phaseShift
+#' @param trackList TrackList object that is the 'parent' of the provided track
+#' @param track Track object to fit
+#' @param slot character value indictating the velocity slot to fit the trackSweep function to (default='vx', other option is typically the smoothed velocity, e.g., 'vxs')
 #'
 #' @export
-sseBulkGS <- function(x, trackList, trackMatrix, amplitude, timeScalingFactor)
+getTrackAmplitude <- function(trackList, track, slot='vx')
 {
+     amplitudeGuess <- tl$meta$amplitudeGuess
+     amplitudeLimits=c(0, 10*amplitudeGuess)
+     par <- c(amplitude=amplitudeGuess)
 
+     bestFit <- optim(par=guess,
+                      function(par, trackList, track, slot){sseTrack(trackList=trackList, track=track, slot=slot, amplitude=par['amplitude'], phaseShift=0, ti=trackList$meta$ti, fi=trackList$meta$fi, ff=trackList$meta$ff)},
+                      method='L-BFGS-B',
+                      lower=c(min(amplitudeLimits)),
+                      upper=c(max(amplitudeLimits)),
+                      control=list(trace=0),
+                      trackList=trackList,
+                      track=track,
+                      slot=slot)
+     return(par['amplitude'])
+}
 
-     # Cols are frames, rows are track ids
-     # we pass the 'trackMatrix' so we don't have to obtain it each iteration
+# ccc # ccc sseBulk
+# ccc # ccc
+# ccc # ccc @param trackList A TrackList object
+# ccc # ccc @param trackMatrix The trackMatrix of the TrackList object (so it doesn't need to be calculated for every call to this function)
+# ccc # ccc @param amplitude A numeric value of the amplitude of the sweep function.
+# ccc # ccc @param phaseShift A numeric value of the phase shift of the sweep function.
+# ccc # ccc @param timeScalingFactor A numeric value of the time scaling factor
+# ccc # ccc @param ti A numeric value of the initial time of the first frame
+# ccc # ccc
+# ccc # ccc @return the sum square error between the TrackList data and a sweep with the provided amplitude and phaseShift
+# ccc # ccc
+# ccc # ccc @export
+# ccc sseBulk <- function(trackList, trackMatrix, amplitude, phaseShift, timeScalingFactor, ti)
+# ccc {
+# ccc      # Cols are frames, rows are track ids
+# ccc      # we pass the 'trackMatrix' so we don't have to obtain it each iteration
+# ccc
+# ccc      # get the sweep (for this we need the 'trackList')
+# ccc      sweep <- getSweep(amplitude=amplitude, phaseShift=phaseShift, offset=pi, sin=trackList$meta$sin, ti=ti, fi=trackList$meta$fi, ff=trackList$meta$ff, sweepDuration=timeScalingFactor*trackList$meta$sweepDuration, t=trackList$meta$allTimes, guess=NULL)
+# ccc      # For each index in allTimes (i.e., for each frame)
+# ccc      sse <- sum((t(trackMatrix)-sweep$v)^2, na.rm=TRUE) # Do the transpose because the subtract function typically makes the subtracted vector vertical
+# ccc      cat("(", amplitude, ",", timeScalingFactor, ",", ti, ") = ", sse, "\n", sep="")
+# ccc      return(sse)
+# ccc }
+
+#' sseBulkGS
+#'
+#' @param x numeric value indicating a value of ti to pass to 'getSweep' to generate a curve for calculating the sse
+#' @param trackList TrackList object for which to calculate the sse
+#' @param trackMatrix numeric matrix of track velocity data for all frames and tracks (passed here to avoid recalculation at each iteration)
+#' @param amplitude numeric value indicating the sweep's amplitude parameter for the oscillatory motion (see 'getSweep')
+#'
+#' @return the sum square error between the TrackList data and a sweep with the provided amplitude
+#'
+#' @export
+sseBulkGS <- function(x, trackList, trackMatrix, amplitude)
+{
+     # In the track matrix, cols are frames, rows are track ids
 
      # get the sweep (for this we need the 'trackList')
-     sweep <- getSweep(amplitude=amplitude, phaseShift=0, offset=pi, sin=trackList$meta$sin, ti=x[1], fi=trackList$meta$fi, ff=trackList$meta$ff, sweepDuration=timeScalingFactor*trackList$meta$sweepDuration, t=trackList$meta$allTimes, guess=NULL)
-     # For each index in allTimes (i.e., for each frame)
-
-     #sse <- sum((t(trackMatrix)-sweep$v)^2, na.rm=TRUE) # Do the transpose because the subtract function typically makes the subtracted vector vertical
+     sweep <- getSweep(amplitude=amplitude, phaseShift=0, offset=0, sin=trackList$meta$sin, ti=x, fi=trackList$meta$fi, ff=trackList$meta$ff, sweepDuration=trackList$meta$sweepDuration, t=trackList$meta$allTimes, guess=NULL, flipped=T)
 
      if(is.matrix(trackMatrix))
      {
@@ -156,105 +186,105 @@ sseBulkGS <- function(x, trackList, trackMatrix, amplitude, timeScalingFactor)
           sse <- sum((sign(trackMatrix)-sign(sweep$v))^2) # Do the transpose because the subtract function typically makes the subtracted vector vertical
      }
 
-     cat("(", x[1], ",", x[2], ") = ", sse, "\n", sep="")
+     cat("(", x, ")", " -> ", sse, "\n", sep="")
      return(sse)
 }
 
-#' sseBulk2
-#'
-#' @param trackList default
-#' @param trackMatrix default
-#' @param amplitude default
-#' @param phaseShift default
-#' @param ti default
-#' @param fi default
-#' @param ff default
-#'
-#' @return the sum square error between the TrackList data and a sweep with the provided amplitude and phaseShift
-#'
-#' @export
-sseBulk2 <- function(trackList, trackMatrix, amplitude, phaseShift, ti, fi, ff)
-{
-     # Cols are frames, rows are track ids
-     # we pass the 'trackMatrix' so we don't have to obtain it each iteration
-     timeScalingFactor = 1
-     # get the sweep (for this we need the 'trackList')
-     sweep <- getSweep(amplitude=amplitude, phaseShift=phaseShift, offset=pi, sin=trackList$meta$sin, ti, fi=fi, ff=ff, sweepDuration=timeScalingFactor*trackList$meta$sweepDuration, t=trackList$meta$allTimes, guess=NULL)
-     # For each index in allTimes (i.e., for each frame)
-     sse <- sum((t(trackMatrix)-sweep$v)^2, na.rm=TRUE) # Do the transpose because the subtract function typically makes the subtracted vector vertical
-     cat("(", amplitude, ",", 1.00, ",", ti, ",", fi, ",", ff, ") = ", sse, "\n", sep="")
-     return(sse)
-}
-
-#' Fit the data to determine the phase shift
-#'
-#' Guess the other parameters from the average of the data.
-#'
-#' @param trackList A TrackList object
-#' @param tiGuess A numeric value guessing the frame at which time actually equals zero (i.e., the fluid frequency sweep is started).
-#'
-#' @export
-getBulkPhaseShift <- function(trackList, tiGuess=0)
-{
-     phaseShift <- pi
-     # require(stats)
-     trackMatrix <- trackList$getMatrix()
-     amplitude <- max(as.numeric(trackList$applyFun_Return(fun=function(x){r <- x$range('x', rel=TRUE); r <- (r[2]-r[1])/5; return(r)})))
-     guess <- c(timeScalingFactor=1, ti=tiGuess)
-     #guess <- c(amplitude=amplitude, phaseShift=1.2*pi)
-     #amplitudeLimits=c(0.1*amplitude, amplitude)
-     #phaseShiftLimits=c(1*pi,1.4*pi)
-     timeScalingFactorLimits=c(0.99, 1.01)
-     tiLimits=c(-0.5/trackList$meta$fi, 0.5/trackList$meta$fi)
-     #sweepDurationLimits=c(0.98*trackList$meta$sweepDuration, 1.02*trackList$meta$sweepDuration)
-     #fiLimits=c(0.98*trackList$meta$fi, 1.02*trackList$meta$fi)
-     #ffLimits=c(0.98*trackList$meta$ff, 1.02*trackList$meta$ff)
-     bestFit <- optim(par=guess,
-                      function(par, trackList, trackMatrix){sseBulk(trackList=trackList, trackMatrix=trackMatrix, amplitude=amplitude, phaseShift=phaseShift, timeScalingFactor=par['timeScalingFactor'], ti=par['ti'])},
-                      method='L-BFGS-B',
-                      #method='SANN',
-                      lower=c(min(timeScalingFactorLimits), min(tiLimits)),
-                      upper=c(max(timeScalingFactorLimits), max(tiLimits)),
-                      control=list(trace=0),
-                      trackList=trackList,
-                      trackMatrix=trackMatrix)
-     return(list(par=c(phaseShift=phaseShift, amplitude=amplitude, timeScalingFactor=as.numeric(bestFit$par['timeScalingFactor']), ti=as.numeric(bestFit$par['ti']), offset=as.numeric(bestFit$par['offset'])), fit=bestFit))
-}
-
-#' Fit the data to determine the phase shift (version 2)
-#'
-#' Guess the other parameters from the average of the data.
-#'
-#' @param trackList A TrackList object
-#' @param tiGuess A numeric value guessing the frame at which time actually equals zero (i.e., the fluid frequency sweep is started).
-#'
-#' @export
-getBulkPhaseShift2 <- function(trackList, tiGuess=0)
-{
-     phaseShift <- pi
-     #require(stats)
-     trackMatrix <- trackList$getMatrix()
-     amplitude <- max(as.numeric(trackList$applyFun_Return(fun=function(x){r <- x$range('x', rel=TRUE); r <- (r[2]-r[1])/5; return(r)})))
-     guess <- c(ti=tiGuess, fi=trackList$meta$fi, ff=trackList$meta$ff)
-     #guess <- c(amplitude=amplitude, phaseShift=1.2*pi)
-     #amplitudeLimits=c(0.1*amplitude, amplitude)
-     #phaseShiftLimits=c(1*pi,1.4*pi)
-     #timeScalingFactorLimits=c(0.99, 1.01)
-     tiLimits=c(-0.55/trackList$meta$fi, 0.55/trackList$meta$fi)
-     #sweepDurationLimits=c(0.98*trackList$meta$sweepDuration, 1.02*trackList$meta$sweepDuration)
-     fiLimits=c(0.98*trackList$meta$fi, 1.05*trackList$meta$fi)
-     ffLimits=c(0.98*trackList$meta$ff, 1.05*trackList$meta$ff)
-     bestFit <- optim(par=guess,
-                      function(par, trackList, trackMatrix){sseBulk2(trackList=trackList, trackMatrix=trackMatrix, amplitude=amplitude, phaseShift=phaseShift, ti=par['ti'], fi=par['fi'], ff=par['ff'])},
-                      method='L-BFGS-B',
-                      #method='SANN',
-                      lower=c(min(tiLimits), min(fiLimits), min(ffLimits)),
-                      upper=c(max(tiLimits), max(fiLimits), max(ffLimits)),
-                      control=list(trace=0),
-                      trackList=trackList,
-                      trackMatrix=trackMatrix)
-     return(list(par=c(phaseShift=phaseShift, amplitude=amplitude, timeScalingFactor=1.00, ti=as.numeric(bestFit$par['ti']), fi=as.numeric(bestFit$par['fi']), ff=as.numeric(bestFit$par['ff']), offset=as.numeric(bestFit$par['offset'])), fit=bestFit))
-}
+# ccc # ccc sseBulk2
+# ccc # ccc
+# ccc # ccc @param trackList default
+# ccc # ccc @param trackMatrix default
+# ccc # ccc @param amplitude default
+# ccc # ccc @param phaseShift default
+# ccc # ccc @param ti default
+# ccc # ccc @param fi default
+# ccc # ccc @param ff default
+# ccc # ccc
+# ccc # ccc @return the sum square error between the TrackList data and a sweep with the provided amplitude and phaseShift
+# ccc # ccc
+# ccc # ccc @export
+# ccc sseBulk2 <- function(trackList, trackMatrix, amplitude, phaseShift, ti, fi, ff)
+# ccc {
+# ccc      # Cols are frames, rows are track ids
+# ccc      # we pass the 'trackMatrix' so we don't have to obtain it each iteration
+# ccc      timeScalingFactor = 1
+# ccc      # get the sweep (for this we need the 'trackList')
+# ccc      sweep <- getSweep(amplitude=amplitude, phaseShift=phaseShift, offset=pi, sin=trackList$meta$sin, ti, fi=fi, ff=ff, sweepDuration=timeScalingFactor*trackList$meta$sweepDuration, t=trackList$meta$allTimes, guess=NULL)
+# ccc      # For each index in allTimes (i.e., for each frame)
+# ccc      sse <- sum((t(trackMatrix)-sweep$v)^2, na.rm=TRUE) # Do the transpose because the subtract function typically makes the subtracted vector vertical
+# ccc      cat("(", amplitude, ",", 1.00, ",", ti, ",", fi, ",", ff, ") = ", sse, "\n", sep="")
+# ccc      return(sse)
+# ccc }
+# ccc
+# ccc # ccc Fit the data to determine the phase shift
+# ccc # ccc
+# ccc # ccc Guess the other parameters from the average of the data.
+# ccc # ccc
+# ccc # ccc @param trackList A TrackList object
+# ccc # ccc @param tiGuess A numeric value guessing the frame at which time actually equals zero (i.e., the fluid frequency sweep is started).
+# ccc # ccc
+# ccc # ccc @export
+# ccc getBulkPhaseShift <- function(trackList, tiGuess=0)
+# ccc {
+# ccc      phaseShift <- pi
+# ccc      # require(stats)
+# ccc      trackMatrix <- trackList$getMatrix()
+# ccc      amplitude <- max(as.numeric(trackList$applyFun_Return(fun=function(x){r <- x$range('x', rel=TRUE); r <- (r[2]-r[1])/5; return(r)})))
+# ccc      guess <- c(timeScalingFactor=1, ti=tiGuess)
+# ccc      #guess <- c(amplitude=amplitude, phaseShift=1.2*pi)
+# ccc      #amplitudeLimits=c(0.1*amplitude, amplitude)
+# ccc      #phaseShiftLimits=c(1*pi,1.4*pi)
+# ccc      timeScalingFactorLimits=c(0.99, 1.01)
+# ccc      tiLimits=c(-0.5/trackList$meta$fi, 0.5/trackList$meta$fi)
+# ccc      #sweepDurationLimits=c(0.98*trackList$meta$sweepDuration, 1.02*trackList$meta$sweepDuration)
+# ccc      #fiLimits=c(0.98*trackList$meta$fi, 1.02*trackList$meta$fi)
+# ccc      #ffLimits=c(0.98*trackList$meta$ff, 1.02*trackList$meta$ff)
+# ccc      bestFit <- optim(par=guess,
+# ccc                       function(par, trackList, trackMatrix){sseBulk(trackList=trackList, trackMatrix=trackMatrix, amplitude=amplitude, phaseShift=phaseShift, timeScalingFactor=par['timeScalingFactor'], ti=par['ti'])},
+# ccc                       method='L-BFGS-B',
+# ccc                       #method='SANN',
+# ccc                       lower=c(min(timeScalingFactorLimits), min(tiLimits)),
+# ccc                       upper=c(max(timeScalingFactorLimits), max(tiLimits)),
+# ccc                       control=list(trace=0),
+# ccc                       trackList=trackList,
+# ccc                       trackMatrix=trackMatrix)
+# ccc      return(list(par=c(phaseShift=phaseShift, amplitude=amplitude, timeScalingFactor=as.numeric(bestFit$par['timeScalingFactor']), ti=as.numeric(bestFit$par['ti']), offset=as.numeric(bestFit$par['offset'])), fit=bestFit))
+# ccc }
+# ccc
+# ccc # ccc Fit the data to determine the phase shift (version 2)
+# ccc # ccc
+# ccc # ccc Guess the other parameters from the average of the data.
+# ccc # ccc
+# ccc # ccc @param trackList A TrackList object
+# ccc # ccc @param tiGuess A numeric value guessing the frame at which time actually equals zero (i.e., the fluid frequency sweep is started).
+# ccc # ccc
+# ccc # ccc @export
+# ccc getBulkPhaseShift2 <- function(trackList, tiGuess=0)
+# ccc {
+# ccc      phaseShift <- pi
+# ccc      #require(stats)
+# ccc      trackMatrix <- trackList$getMatrix()
+# ccc      amplitude <- max(as.numeric(trackList$applyFun_Return(fun=function(x){r <- x$range('x', rel=TRUE); r <- (r[2]-r[1])/5; return(r)})))
+# ccc      guess <- c(ti=tiGuess, fi=trackList$meta$fi, ff=trackList$meta$ff)
+# ccc      #guess <- c(amplitude=amplitude, phaseShift=1.2*pi)
+# ccc      #amplitudeLimits=c(0.1*amplitude, amplitude)
+# ccc      #phaseShiftLimits=c(1*pi,1.4*pi)
+# ccc      #timeScalingFactorLimits=c(0.99, 1.01)
+# ccc      tiLimits=c(-0.55/trackList$meta$fi, 0.55/trackList$meta$fi)
+# ccc      #sweepDurationLimits=c(0.98*trackList$meta$sweepDuration, 1.02*trackList$meta$sweepDuration)
+# ccc      fiLimits=c(0.98*trackList$meta$fi, 1.05*trackList$meta$fi)
+# ccc      ffLimits=c(0.98*trackList$meta$ff, 1.05*trackList$meta$ff)
+# ccc      bestFit <- optim(par=guess,
+# ccc                       function(par, trackList, trackMatrix){sseBulk2(trackList=trackList, trackMatrix=trackMatrix, amplitude=amplitude, phaseShift=phaseShift, ti=par['ti'], fi=par['fi'], ff=par['ff'])},
+# ccc                       method='L-BFGS-B',
+# ccc                       #method='SANN',
+# ccc                       lower=c(min(tiLimits), min(fiLimits), min(ffLimits)),
+# ccc                       upper=c(max(tiLimits), max(fiLimits), max(ffLimits)),
+# ccc                       control=list(trace=0),
+# ccc                       trackList=trackList,
+# ccc                       trackMatrix=trackMatrix)
+# ccc      return(list(par=c(phaseShift=phaseShift, amplitude=amplitude, timeScalingFactor=1.00, ti=as.numeric(bestFit$par['ti']), fi=as.numeric(bestFit$par['fi']), ff=as.numeric(bestFit$par['ff']), offset=as.numeric(bestFit$par['offset'])), fit=bestFit))
+# ccc }
 
 
 #' Fit the data to determine the phase shift (version GridSearch, GS)
@@ -291,16 +321,16 @@ getBulkPhaseShiftGS <- function(trackList, ti=seq(-1,1,1/30), phaseShift=seq(-pi
      lines(t, sign(getSweep(amplitude = amplitude, fi=trackList$meta$fi, ff=trackList$meta$ff, ti=0, t=t, flipped=TRUE)$v), col='green')
 
      #Time scaling factor is basically useless, we can be about 0.015 seconds off by guessing 0.035s frame rate after 300s (i.e, a half a frame).
-     #Vary phaseShift, ti
+     #Vary ti and make sure the sweep is "flipped" correctly.
 
      if(cores > 1)
      {
           mc.control <- list(mc.cores=cores)
-          res <- gridSearch(sseBulkGS, levels=list(ti=ti), trackList=trackList, trackMatrix=trackMatrix, amplitude=amplitude, timeScalingFactor=1, method='multicore', mc.control=mc.control)
+          res <- gridSearch(sseBulkGS, levels=list(ti=ti), trackList=trackList, trackMatrix=trackMatrix, amplitude=amplitude, method='multicore', mc.control=mc.control)
      }
      else
      {
-          res <- gridSearch(sseBulkGS, levels=list(ti=ti), trackList=trackList, trackMatrix=trackMatrix, amplitude=amplitude, timeScalingFactor=1, method='loop')
+          res <- gridSearch(sseBulkGS, levels=list(ti=ti), trackList=trackList, trackMatrix=trackMatrix, amplitude=amplitude, method='loop')
      }
 
      finalPhaseShift <- 0 #res$minlevels[2]

@@ -84,15 +84,15 @@ PointSet <- setRefClass("PointSet",
 
                                 if(nrow(pts) > 0)
                                 {
-                                     if((ncol(pts) - 1) > base::length(...))
+                                     if((ncol(pts)-1) != base::length(list(...)))
                                      {
-                                          stop(paste0("The number of arguments does not match the number needed to properly define a point based upon the data already existing in the PoinSet.\n\nCurrent column names (including 'id'): ", paste(names(pts)[!names(pts) %in% 'id'])))
+                                          stop(paste0("The number of arguments does not match the number needed to properly define a point based upon the data already existing in the PointSet.\n\nCurrent column names (including 'id'): ", paste(names(pts)[!names(pts) %in% 'id'])))
                                      }
                                 }
 
                                 if(id %in% pts$id)
                                 {
-                                     stop(paste0("Cannot add the point. The PointSet already contains a point with this id: ", paste(names(pts), collapse=','), ' -> ', paste(getPoint(id=id), collapse=',')))
+                                     stop(paste0("Cannot add the point. The PointSet already contains a point with this same id: ", paste(names(pts), collapse=','), ' -> ', paste(getPoint(id=id), collapse=',')))
                                 }
 
                                 # Note that rbind behaves well if pts is initially NULL

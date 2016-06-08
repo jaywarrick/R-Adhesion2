@@ -24,6 +24,52 @@ getStandardCostMatrix <- function(data0, data1, digits, maxDist)
      return(abs(getDirectionalCostMatrix( data0 = data0, data1 = data1, digits, maxDist = maxDist, direction = c(1,numeric(ncol(data0)-1)), perpendicularPenaltyFactor = 1)))
 }
 
+# getTrackLinkingCosts <- function(pointSet0, pointSet1, direction, perpendicularPenaltyFactor=1, maxFrameGap=1, maxDist, velocitySlots=NULL)
+# {
+#      # Get the data as matrices for matrix calcs
+#      data0 <- as.matrix(pointSet0$pts)
+#      data1 <- as.matrix(pointSet1$pts)
+#
+#      # Establish important costs
+#      maxLinkingCost <- maxDist*maxDist
+#      blockingCost <- 10*maxLinkingCost
+#
+#      # Reformat the data
+#      # get the pair-wise combinations of the data by replicating the rows in each data
+#      # object appropriately
+#      dataReps <- getDataReps(data0, data1)
+#
+#      # allow direct access to dataReps$x0 and dataReps$x1
+#      x0 <- dataReps$x0
+#      x1 <- dataReps$x1
+#
+#      # Calculate the costs
+#      # make sure direction is a unit vector by dividing all components by its magnitude
+#      direction <- direction/(sqrt(sum(direction^2)))
+#
+#      # Calculate movement vectors for each combination
+#      movement <- x1-x0
+#      parallelMovement <- movement%*%direction # dot product of direction with each row of the movement matrix
+#      movementSign <- sign(parallelMovement)
+#      velocitySign <- sign()
+#      perpendicularMovement2 <- rowSums(movement*movement) - parallelMovement*parallelMovement
+#
+#      # Calculate cost
+#      cost <- parallelMovement*parallelMovement + ((perpendicularPenaltyFactor*perpendicularPenaltyFactor)*perpendicularMovement2) # Penalize perpendicular movement in proportion to the expected ratio of motion expected parallel vs perpendicular to the specified direction
+#      cost[cost >= maxLinkingCost] <- blockingCost
+#
+#      # Just want to keep track of positive and negative. Sign can be 0 for 0's so just make them 1's
+#      # so that they don't result in a zero cost when multiplying the costs by the signs again.
+#      movementSign[movementSign == 0] <- 1
+#      cost <- cost*movementSign
+#      cost <- matrix(cost, nrow(data0), nrow(data1))
+#
+#      # Assemble the cost matrix (apply the digits precision to the )
+#      results <- getCostMatrix(UL=cost, digits=digits, maxLinkingCost=maxLinkingCost, blockingCost=blockingCost)
+#
+#      return(results)
+# }
+
 #' getDirectionalCostMatrix
 #'
 #' This function produces a cost matrix of the format described for point linking in the following paper.
@@ -224,7 +270,7 @@ directionalLinearAssignment <- function(pointSet0, pointSet1, digits, maxDist, d
 #'
 #' @param pointSet0 PointSet object from the 'before' time (startpoint of link)
 #' @param pointSet1 PointSet object from the 'after' time (endpoint of link)
-#' @param linearAssigmentResult data.frame with columns id0 and id1 indicating which ids from pointSet0 are linked to pointSet1. Others are not linked.
+#' @param px numeric vector representing the permutation matrix result from GraphAlignment::LinearAssignment
 #'
 #' @export
 getAssignments <- function(pointSet0, pointSet1, px)

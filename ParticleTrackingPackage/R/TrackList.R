@@ -9,16 +9,17 @@ NULL
 #' @field meta A list of metadata
 #'
 #' Metadata for log frequency sweep data includes:
-#' sin boolean Whether the tracks are sinusoidal or triangular
-#' fi numeric The initial frequency of the sweep
-#' ff numeric The final frequency of the sweep
-#' phaseShift numeric The phase shift of the sweep
-#' t0_Frame numeric The frame associated with time=0 of the sweep
-#' timePerFrame numeric The time per frame of the data in seconds
-#' sweepDurtion numeric The time duration of the sweep in seconds
-#' allTimes numeric vector The vector of times associate with 'allFrames'
-#' allFrames numeric vector The vector containing a complete list of frame numbers existing in the data set
-#' selectedFrames numeric vector The subset of 'allFrames' which are set as valid using 'setSelectedFrames'
+#'
+#' \strong{sin} boolean Whether the tracks are sinusoidal or triangular;
+#' \strong{fi} numeric The initial frequency of the sweep;
+#' \strong{ff} numeric The final frequency of the sweep;
+#' \strong{phaseShift} numeric The phase shift of the sweep;
+#' \strong{t0_Frame} numeric The frame associated with time=0 of the sweep;
+#' \strong{timePerFrame} numeric The time per frame of the data in seconds;
+#' \strong{sweepDurtion} numeric The time duration of the sweep in seconds;
+#' \strong{allTimes} numeric vector The vector of times associate with 'allFrames';
+#' \strong{allFrames} numeric vector The vector containing a complete list of frame numbers existing in the data set;
+#' \strong{selectedFrames} numeric vector The subset of 'allFrames' which are set as valid using 'setSelectedFrames'
 TrackList <- setRefClass('TrackList',
 					fields = list(tracks='list', meta='list'), #sin='logical', fi='numeric', ff='numeric', phaseShift='numeric', t0_Frame='numeric', timePerFrame='numeric', sweepDuration='numeric', allTimes='numeric', allFrames='numeric', selectedFrames='numeric'
 					methods = list(
@@ -136,7 +137,6 @@ TrackList <- setRefClass('TrackList',
 							is replaced\n
 							@param newTrack Track the track to put into the list/set"
 
-							# newTrack$.parent <- .self // Only need to setMeta once after all tracks are added
 							tracks[[as.character(newTrack$id)]] <<- newTrack
 						},
 						removeTrack = function(id)
@@ -151,16 +151,15 @@ TrackList <- setRefClass('TrackList',
 							"Add the given point (x, y, frame) to the track associated with the provided ID
 							This is useful for building a TrackList one point at a time instead via initialization with a file\n
 							@param id numeric The ID number of the track of interest\n
-							@param x numeric The x position of the point\n
-							@param y numeric The y position of the point\n
-							@param frame numeric The frame number of the point"
+						     @param frame numeric The frame number of the point\n
+							@param ... numeric or character data to store as the 'position'/'data' of the point"
+
 
 							track <- getTrack(id)
 							if(is.null(track))
 							{
 								track <- new('Track')
 								track$id <- id
-								# track$.parent <- .self # setTrack resets .parent
 							}
 							track$addPoint(frame=frame, ...)
 							setTrack(track)
@@ -225,8 +224,7 @@ TrackList <- setRefClass('TrackList',
 						     Store the t0_Frame and timePerFrame information in the 'meta' list field of the TrackList.
 						     The t0_Frame is the frame for which the time is equal to 0 and the amount
 						     of time between each frame is the timePerFrame. From this information, the time
-						     associated with each frame is determined as well as the time derivatives
-						     of each measure.\n
+						     associated with each frame is determined. Time information is often useful for using 'calculateDerivatives'.\n
 						     Given the frames in the TrackList, t0_Frame, and timePerFrame, we can calculate
 						     the times associated with each frame that exists within the TrackList
 						     and set that information in the metadata object as 'allTimes'. This also
@@ -323,15 +321,7 @@ TrackList <- setRefClass('TrackList',
 						{
 						     "Calculate the average value of a track slot such as x, y, vx, vxs, vy, and vys
 						     return it as a vector."
-                                   if(selectedOnly)
-                                   {
-                                        return(colMeans(getMatrix(slot=slot, rel=rel, selectedFrames=meta$selectedFrames)))
-                                   }
-						     else
-						     {
-						          return(colMeans(getMatrix(slot=slot, rel=rel, selectedFrames=meta$allFrames)))
-						     }
-
+						     return(colMeans(getMatrix(slot=slot, rel=rel, selectedOnly=selectedOnly), na.rm=T)) # Must remove NA's because calcualting across tracks
 						},
 						save = function(objectName, file) {
 							"Save the current object on the file in R external object format."
@@ -350,6 +340,23 @@ TrackList <- setRefClass('TrackList',
 							{
 								tracks[as.character(.track$id)] <<- .track$copy()
 							}
+						},
+						getPointSetListOfTrackEnds = function(slots)
+						{
+						     before <- new('PointSet')
+						     before$initializeEmpty(frame=1)
+						     after <- new('PointSet')
+						     after$initializeEmpty(frame=2)
+						     slots <- slots[slots %in% names(tracks[[1]]$pts)]
+						     for(track in tracks)
+						     {
+						          do.call(before$addPoint, c(list(id=track$id), as.list(track$pts[1,slots]))) # first point
+						          do.call(after$addPoint, c(list(id=track$id), as.list(track$pts[track$frameCount(),slots]))) # last point
+						     }
+						     ret <- new('PointSetList')
+						     ret$setPointSet(before)
+						     ret$setPointSet(after)
+						     return(ret)
 						}
 					)
 )

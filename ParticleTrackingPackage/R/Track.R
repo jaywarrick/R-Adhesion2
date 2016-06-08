@@ -272,9 +272,8 @@ Track <- setRefClass('Track',
 #' Get the adjustable running window average of the data
 #'
 #' @param i The index within 'frames' at which to calculate an average over a window centered at this location
-#' @param frames The frames in this track
 #' @param widths A vector of window widths appropriate for each frame in the 'frames' of this track
-#' @param data The vector of data for which we will calculate the windowed averages
+#' @param x The vector of data for which we will calculate the windowed averages
 getAverage <- function(i, widths, x)
 {
      # Subtract 1 to represent the number of intervals instead of number of pts to average
