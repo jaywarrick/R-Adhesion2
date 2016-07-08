@@ -428,13 +428,13 @@ TrackList <- setRefClass('TrackList',
 								track$setValidFrames(meta$validFrames)
 							}
 						},
-						getPercentAdhered = function(velocityThreshold=3)
+						getPercentAdhered = function(velocityThreshold=3, slot='vx')
 						{
 							"Calculate the percent adhered at each timepoint using the provided velocity threshold
                                    @param velocityThrehsold numeric The pixels per second below which (exclusive) a cell is considered adhered - default=3 [pixels/second]\n
 							@return Return a dataframe with columns of 'time' and 'percentAdhered'"
 
-							trackMatrix <- getMatrix(slot='vx', validOnly=TRUE, rel=FALSE)
+							trackMatrix <- getMatrix(slot=slot, validOnly=TRUE, rel=FALSE)
 							ret <- list()
 							cellCount <- getCellCount()
 							frames <- colnames(trackMatrix)
