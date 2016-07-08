@@ -428,7 +428,7 @@ TrackList <- setRefClass('TrackList',
 								track$setValidFrames(meta$validFrames)
 							}
 						},
-						getPercentAdhered = function(velocityThreshold=3, slot='vx')
+						getPercentAdhered = function(velocityThreshold=3, slot='vx', lastFrameCellCount=TRUE)
 						{
 							"Calculate the percent adhered at each timepoint using the provided velocity threshold
                                    @param velocityThrehsold numeric The pixels per second below which (exclusive) a cell is considered adhered - default=3 [pixels/second]\n
@@ -436,7 +436,7 @@ TrackList <- setRefClass('TrackList',
 
 							trackMatrix <- getMatrix(slot=slot, validOnly=TRUE, rel=FALSE)
 							ret <- list()
-							cellCount <- getCellCount()
+							cellCount <- getCellCount(lastFrame=lastFrameCellCount)
 							frames <- colnames(trackMatrix)
 							for(frame in frames)
 							{
@@ -456,7 +456,7 @@ TrackList <- setRefClass('TrackList',
 							times <- meta$tAll[meta$allFrames %in% frames]
 							return(data.frame(time=times, percentAdhered=percents))
 						},
-						getCellCount = function()
+						getCellCount = function(lastFrame=T)
 						{
 						     "Return the number cells/tracks in the TrackList object"
 
@@ -469,8 +469,16 @@ TrackList <- setRefClass('TrackList',
 							{
 								ret <- list()
 								frames <- colnames(trackMatrix)
-								lastFrame <- last(frames)
-								return(sum(!is.na(trackMatrix[,lastFrame])))
+								if(lastFrame)
+								{
+								     lastFrame <- last(frames)
+								     return(sum(!is.na(trackMatrix[,lastFrame])))
+								}
+								else
+								{
+								     firstFrame <- frames[1]
+								     return(sum(!is.na(trackMatrix[,firstFrame])))
+								}
 							}
 						},
 						save = function(objectName, file) {
