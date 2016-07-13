@@ -174,7 +174,7 @@ getBulkPhaseShift2 <- function(trackList, tiGuess=0)
 #' @export
 getBulkPhaseShiftGS <- function(trackList, ti=seq(-1,1,1/30), phaseShift=seq(-pi,pi,pi/30), cores=1)
 {
-     trackMatrix <- trackList$getMatrix(slot='vxs')
+     trackMatrix <- trackList$getMatrix(slot='vx')
 
      t <- trackList$meta$tAll
      x <- colMeans(trackMatrix, na.rm=T)
@@ -188,8 +188,9 @@ getBulkPhaseShiftGS <- function(trackList, ti=seq(-1,1,1/30), phaseShift=seq(-pi
 
      # Don't need to choose decent amplitude anymore since we just turn it into a square wave
      # amplitude <- mean(abs(trackMatrix))*1 # max(as.numeric(trackList$getProp(fun=function(x){r <- x$range('vx', rel=TRUE); r <- (r[2]-r[1])/5; return(r)})))
+     amplitude <- 1
 
-     lines(t, sign(getSweep(amplitude = 1, fi=trackList$meta$fi, ff=trackList$meta$ff, ti=0, t=t, flipped=TRUE)$v), col='green')
+     lines(t, sign(getSweep(amplitude = amplitude, fi=trackList$meta$fi, ff=trackList$meta$ff, ti=0, t=t, flipped=TRUE)$v), col='green')
 
      #Time scaling factor is basically useless, we can be about 0.015 seconds off by guessing 0.035s frame rate after 300s (i.e, a half a frame).
      #Vary phaseShift, ti
