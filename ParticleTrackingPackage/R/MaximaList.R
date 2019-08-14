@@ -236,7 +236,7 @@ MaximaList <- setRefClass('MaximaList',
                                     trackBackStart <<- trackBackStart + offset
                                     trackBackEnd <<- trackBackEnd + offset
                                },
-                               saveROI = function(file)
+                               saveROI = function(file, timeDimName = 'Time')
                                {
                                     "Export this MaximaList object as an ROI object for JEX (https://github.com/jaywarrick/JEX)"
                                     print(as.factor(as.numeric(names(maxima))))
@@ -262,6 +262,7 @@ MaximaList <- setRefClass('MaximaList',
                                          temp1$Value[temp1$Metadata == 'polygonPts' & temp1$Time == .maxima$frame] <- toSave
                                     }
                                     temp1$Time <- as.factor(temp1$Time);
+                                    setnames(temp1, 'Time', timeDimName)
                                     write.arff(temp1, file=file, relation='ROI-Maxima')
                                }
                           )
